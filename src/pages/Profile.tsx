@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Button, message, Avatar, Descriptions, Spin, Tabs, Space } from 'antd';
 import { UserOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
-// import { authAPI } from '../api/auth';  // 暂未使用，先注释
+// import { authAPI } from '../api/auth';  // 暂未使用，先注释d
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
