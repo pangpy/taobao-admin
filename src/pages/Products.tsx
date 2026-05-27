@@ -32,15 +32,23 @@ const Products: React.FC = () => {
     return isNaN(num) ? defaultValue : num;
   };
 
+  // 获取商品列表
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await productAPI.getProducts();
+      const res: any = await productAPI.getProducts();
       console.log('商品列表API返回:', res);
       
       let rawData = [];
-      if (res.code === 200 && res.result && res.result.data) {
-        rawData = res.result.data;
+      // 兼容多种返回格式
+      if (res.code === 200) {
+        if (res.result && res.result.data) {
+          rawData = res.result.data;
+        } else if (res.rows) {
+          rawData = res.rows;
+        } else if (res.data) {
+          rawData = Array.isArray(res.data) ? res.data : [];
+        }
       } else if (res.rows) {
         rawData = res.rows;
       } else if (res.data) {
@@ -280,7 +288,7 @@ const Products: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 200,
+      width: 220,
       render: (_: any, record: Product) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>

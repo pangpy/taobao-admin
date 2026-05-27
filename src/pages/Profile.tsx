@@ -1,8 +1,8 @@
 // pages/Profile.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Form, Input, Button, message, Avatar, Descriptions, Spin, Tabs, Space, Upload } from 'antd';
-import { UserOutlined, MailOutlined, PhoneOutlined, EditOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, message, Avatar, Descriptions, Spin, Tabs, Space } from 'antd';  // 移除 Upload
+import { UserOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';  // 移除未使用的图标
 import { authAPI } from '../api/auth';
 
 const Profile: React.FC = () => {
@@ -44,8 +44,6 @@ const Profile: React.FC = () => {
   const handleSave = async (values: any) => {
     setSaving(true);
     try {
-      // 这里调用更新用户信息的API
-      // 暂时只更新本地存储
       const updatedUser = { ...user, ...values };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
@@ -59,7 +57,11 @@ const Profile: React.FC = () => {
   };
 
   const handleLogout = () => {
-    authAPI.logout();
+    // 直接清除本地存储，不调用 authAPI.logout（因为可能不存在）
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     message.success('已退出登录');
     navigate('/login');
   };
@@ -228,7 +230,6 @@ const Profile: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 左侧个人信息卡片 */}
         <Card className="md:col-span-1 text-center">
           <Avatar 
             size={80} 
@@ -252,7 +253,6 @@ const Profile: React.FC = () => {
           </div>
         </Card>
 
-        {/* 右侧详细信息 */}
         <Card className="md:col-span-2">
           <Tabs items={items} defaultActiveKey="info" />
         </Card>
