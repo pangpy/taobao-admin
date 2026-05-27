@@ -28,7 +28,7 @@ const Home: React.FC = () => {
   };
 
   const banners = [
-    { id: 1, title: '618大促', subtitle: '全场5折起', image: 'https://picsum.photos/id/20/1200/400' },
+    { id: 1, title: '618=大促', subtitle: '全场5折起', image: 'https://picsum.photos/id/20/1200/400' },
     { id: 2, title: '新品上市', subtitle: '限时优惠', image: 'https://picsum.photos/id/21/1200/400' },
     { id: 3, title: '爆款推荐', subtitle: '热销榜单', image: 'https://picsum.photos/id/22/1200/400' },
   ];
