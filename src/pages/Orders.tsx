@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Tag, message } from 'antd';  // 移除未使用的 Button
 import { orderAPI } from '../api/order';
 import { Order } from '../types';
-
+// 手动触发部署 - 2026-05-27  ✅ 添加这行注释
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
