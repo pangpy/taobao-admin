@@ -1,9 +1,9 @@
 // pages/Profile.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Form, Input, Button, message, Avatar, Descriptions, Spin, Tabs, Space } from 'antd';  // 移除 Upload
-import { UserOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';  // 移除未使用的图标
-import { authAPI } from '../api/auth';
+import { Card, Form, Input, Button, message, Avatar, Descriptions, Spin, Tabs, Space } from 'antd';
+import { UserOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
+// import { authAPI } from '../api/auth';  // 暂未使用，先注释
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -57,7 +57,6 @@ const Profile: React.FC = () => {
   };
 
   const handleLogout = () => {
-    // 直接清除本地存储，不调用 authAPI.logout（因为可能不存在）
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('access_token');
