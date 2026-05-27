@@ -9,14 +9,15 @@ import Cart from './pages/Cart';
 import Orders from './pages/Orders';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Profile from './pages/Profile';  // ✅ 添加导入
 import { User } from './types';
-import { initAuthSDK } from './api/sdkHelper';  // 新增导入
+import { initAuthSDK } from './api/sdkHelper';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // 初始化 SDK（新增）
+    // 初始化 SDK
     const account = import.meta.env.VITE_API_ACCOUNT;
     const totpSecret = import.meta.env.VITE_TOTP_SECRET;
     const accessToken = import.meta.env.VITE_ACCESS_TOKEN;
@@ -56,6 +57,8 @@ const App: React.FC = () => {
             <Route path="products" element={user ? <Products /> : <Navigate to="/login" />} />
             <Route path="cart" element={user ? <Cart /> : <Navigate to="/login" />} />
             <Route path="orders" element={user ? <Orders /> : <Navigate to="/login" />} />
+            {/* ✅ 添加个人中心路由 */}
+            <Route path="profile" element={user ? <Profile /> : <Navigate to="/login" />} />
           </Route>
         </Routes>
       </BrowserRouter>

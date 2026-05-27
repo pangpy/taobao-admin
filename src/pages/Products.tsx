@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Image } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { productAPI } from '../api/product';
 import { Product } from '../types';
 
 const { Option } = Select;
 
 const Products: React.FC = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -14,17 +16,48 @@ const Products: React.FC = () => {
   const [form] = Form.useForm();
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      message.warning('请先登录');
+      navigate('/login');
+      return;
+    }
     fetchProducts();
   }, []);
+
+  // 安全转换数字
+  const toNumber = (value: any, defaultValue: number = 0): number => {
+    const num = Number(value);
+    return isNaN(num) ? defaultValue : num;
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
       const res = await productAPI.getProducts();
-      if (res.rows) {
-        setProducts(res.rows);
+      console.log('商品列表API返回:', res);
+      
+      let rawData = [];
+      if (res.code === 200 && res.result && res.result.data) {
+        rawData = res.result.data;
+      } else if (res.rows) {
+        rawData = res.rows;
+      } else if (res.data) {
+        rawData = Array.isArray(res.data) ? res.data : [];
       }
+      
+      const formattedData = rawData.map((item: any) => ({
+        ...item,
+        id: toNumber(item.id),
+        price: toNumber(item.price),
+        original_price: toNumber(item.original_price),
+        stock: toNumber(item.stock),
+        sales: toNumber(item.sales),
+      }));
+      
+      setProducts(formattedData);
     } catch (error) {
+      console.error('获取商品列表失败:', error);
       message.error('获取商品列表失败');
     } finally {
       setLoading(false);
@@ -34,55 +67,169 @@ const Products: React.FC = () => {
   const handleAdd = () => {
     setEditingProduct(null);
     form.resetFields();
+    form.setFieldsValue({
+      status: 'on',
+      stock: 0,
+      price: 0,
+      original_price: 0
+    });
     setModalVisible(true);
   };
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    form.setFieldsValue(product);
+    // 使用 setTimeout 确保 Modal 打开后再设置表单值
     setModalVisible(true);
+    setTimeout(() => {
+      form.setFieldsValue({
+        name: product.name,
+        description: product.description,
+        category: product.category,
+        price: product.price,
+        original_price: product.original_price,
+        stock: product.stock,
+        status: product.status || 'on',
+        images: product.images
+      });
+    }, 50);
   };
 
   const handleDelete = async (id: number) => {
+    console.log('=== 删除商品 ===');
+    console.log('商品 ID:', id);
+    
     try {
-      await productAPI.deleteProduct(id);
-      message.success('删除成功');
-      fetchProducts();
+      const res = await productAPI.deleteProduct(id);
+      console.log('删除响应:', res);
+      
+      if (res && res.code === 200) {
+        message.success('删除成功');
+        fetchProducts();
+      } else {
+        message.error(res?.message || '删除失败');
+      }
     } catch (error) {
+      console.error('删除失败:', error);
       message.error('删除失败');
     }
   };
 
   const handleSubmit = async (values: any) => {
+    console.log('=== 提交商品数据 ===');
+    console.log('编辑模式:', !!editingProduct);
+    console.log('表单数据:', values);
+    
     try {
+      const submitData = {
+        ...values,
+        price: Number(values.price),
+        original_price: Number(values.original_price) || Number(values.price),
+        stock: Number(values.stock),
+      };
+      console.log('提交数据:', submitData);
+      
+      let res;
       if (editingProduct) {
-        await productAPI.updateProduct(editingProduct.id!, values);
-        message.success('更新成功');
+        console.log('执行更新操作, ID:', editingProduct.id);
+        res = await productAPI.updateProduct(editingProduct.id!, submitData);
+        console.log('更新响应:', res);
+        
+        if (res && res.code === 200) {
+          message.success('更新成功');
+          setModalVisible(false);
+          fetchProducts();
+        } else {
+          message.error(res?.message || '更新失败');
+        }
       } else {
-        await productAPI.createProduct(values);
-        message.success('添加成功');
+        console.log('执行创建操作');
+        res = await productAPI.createProduct(submitData);
+        console.log('创建响应:', res);
+        
+        if (res && res.code === 200) {
+          message.success('添加成功');
+          setModalVisible(false);
+          fetchProducts();
+        } else {
+          message.error(res?.message || '添加失败');
+        }
       }
-      setModalVisible(false);
-      fetchProducts();
     } catch (error) {
+      console.error('提交失败:', error);
       message.error(editingProduct ? '更新失败' : '添加失败');
     }
   };
 
+  // 获取图片URL
+  const getImageUrl = (images: string | undefined) => {
+    if (!images) return null;
+    const firstImage = images.split(',')[0].trim();
+    return firstImage || null;
+  };
+
   const columns = [
+    {
+      title: '图片',
+      dataIndex: 'images',
+      key: 'images',
+      width: 80,
+      render: (images: string) => {
+        const imageUrl = getImageUrl(images);
+        if (!imageUrl) {
+          return (
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+              无图
+            </div>
+          );
+        }
+        return (
+          <Image
+            src={imageUrl}
+            alt="商品图片"
+            width={48}
+            height={48}
+            className="object-cover rounded-lg"
+            fallback="https://placehold.co/48x48/4F46E5/white?text=Error"
+            preview={{ mask: <EyeOutlined /> }}
+          />
+        );
+      }
+    },
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
-    { title: '商品名称', dataIndex: 'name', key: 'name' },
+    { title: '商品名称', dataIndex: 'name', key: 'name', ellipsis: true },
     { title: '分类', dataIndex: 'category', key: 'category', width: 100 },
-    { title: '价格', dataIndex: 'price', key: 'price', width: 100, render: (price: number) => `¥${price}` },
+    { 
+      title: '价格', 
+      dataIndex: 'price', 
+      key: 'price', 
+      width: 100, 
+      render: (price: number) => {
+        const num = typeof price === 'number' ? price : Number(price);
+        return isNaN(num) ? '¥0.00' : `¥${num.toFixed(2)}`;
+      }
+    },
+    { 
+      title: '原价', 
+      dataIndex: 'original_price', 
+      key: 'original_price', 
+      width: 100, 
+      render: (price: number) => {
+        if (!price && price !== 0) return '-';
+        const num = typeof price === 'number' ? price : Number(price);
+        return isNaN(num) ? '-' : `¥${num.toFixed(2)}`;
+      }
+    },
     { title: '库存', dataIndex: 'stock', key: 'stock', width: 80 },
-    { title: '销量', dataIndex: 'sales', key: 'sales', width: 80 },
+    { title: '销量', dataIndex: 'sales', key: 'sales', width: 80, render: (sales: number) => sales || 0 },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 80,
       render: (status: string) => (
-        <Tag color={status === 'on' ? 'green' : 'red'}>{status === 'on' ? '在售' : '下架'}</Tag>
+        <Tag color={status === 'on' ? 'green' : 'red'}>
+          {status === 'on' ? '在售' : '下架'}
+        </Tag>
       )
     },
     {
@@ -91,9 +238,18 @@ const Products: React.FC = () => {
       width: 150,
       render: (_: any, record: Product) => (
         <Space>
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>编辑</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id!)}>
-            <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+            编辑
+          </Button>
+          <Popconfirm 
+            title="确定删除吗？" 
+            onConfirm={() => handleDelete(record.id!)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
           </Popconfirm>
         </Space>
       )
@@ -114,7 +270,8 @@ const Products: React.FC = () => {
         dataSource={products}
         rowKey="id"
         loading={loading}
-        pagination={{ pageSize: 10 }}
+        pagination={{ pageSize: 10, showTotal: (total) => `共 ${total} 条` }}
+        locale={{ emptyText: '暂无商品数据，点击"添加商品"创建' }}
       />
 
       <Modal
@@ -123,44 +280,110 @@ const Products: React.FC = () => {
         onCancel={() => setModalVisible(false)}
         footer={null}
         width={600}
+        destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item name="name" label="商品名称" rules={[{ required: true }]}>
-            <Input />
+        <Form 
+          form={form}
+          layout="vertical" 
+          onFinish={handleSubmit}
+          initialValues={{
+            status: 'on',
+            stock: 0,
+            price: 0,
+            original_price: 0
+          }}
+        >
+          <Form.Item 
+            name="name" 
+            label="商品名称" 
+            rules={[{ required: true, message: '请输入商品名称' }]}
+          >
+            <Input placeholder="请输入商品名称" />
           </Form.Item>
+          
           <Form.Item name="description" label="商品描述">
-            <Input.TextArea rows={3} />
+            <Input.TextArea rows={3} placeholder="请输入商品描述" />
           </Form.Item>
-          <Form.Item name="category" label="分类" rules={[{ required: true }]}>
-            <Select>
+          
+          <Form.Item 
+            name="category" 
+            label="分类" 
+            rules={[{ required: true, message: '请选择分类' }]}
+          >
+            <Select placeholder="请选择分类">
               <Option value="电子产品">电子产品</Option>
               <Option value="服装鞋包">服装鞋包</Option>
               <Option value="家居用品">家居用品</Option>
               <Option value="食品饮料">食品饮料</Option>
+              <Option value="美妆个护">美妆个护</Option>
+              <Option value="母婴用品">母婴用品</Option>
             </Select>
           </Form.Item>
-          <Form.Item name="price" label="价格" rules={[{ required: true }]}>
-            <InputNumber min={0} precision={2} className="w-full" />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item 
+              name="price" 
+              label="售价" 
+              rules={[{ required: true, message: '请输入售价' }]}
+            >
+              <InputNumber 
+                min={0} 
+                precision={2} 
+                className="w-full" 
+                placeholder="0.00"
+                prefix="¥"
+              />
+            </Form.Item>
+            
+            <Form.Item name="original_price" label="原价">
+              <InputNumber 
+                min={0} 
+                precision={2} 
+                className="w-full" 
+                placeholder="0.00"
+                prefix="¥"
+              />
+            </Form.Item>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item 
+              name="stock" 
+              label="库存" 
+              rules={[{ required: true, message: '请输入库存' }]}
+            >
+              <InputNumber min={0} className="w-full" placeholder="0" />
+            </Form.Item>
+            
+            <Form.Item 
+              name="status" 
+              label="状态" 
+              rules={[{ required: true, message: '请选择状态' }]}
+            >
+              <Select>
+                <Option value="on">在售</Option>
+                <Option value="off">下架</Option>
+              </Select>
+            </Form.Item>
+          </div>
+          
+          <Form.Item 
+            name="images" 
+            label="图片URL" 
+            tooltip="支持单张图片或多张图片（用逗号分隔）"
+          >
+            <Input.TextArea 
+              rows={2} 
+              placeholder="https://placehold.co/300x300/4F46E5/white?text=Product" 
+            />
           </Form.Item>
-          <Form.Item name="original_price" label="原价">
-            <InputNumber min={0} precision={2} className="w-full" />
-          </Form.Item>
-          <Form.Item name="stock" label="库存" rules={[{ required: true }]}>
-            <InputNumber min={0} className="w-full" />
-          </Form.Item>
-          <Form.Item name="status" label="状态" rules={[{ required: true }]}>
-            <Select>
-              <Option value="on">在售</Option>
-              <Option value="off">下架</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="images" label="图片URL">
-            <Input placeholder="商品图片链接" />
-          </Form.Item>
+          
           <Form.Item>
             <Space className="w-full justify-end">
               <Button onClick={() => setModalVisible(false)}>取消</Button>
-              <Button type="primary" htmlType="submit">确定</Button>
+              <Button type="primary" htmlType="submit">
+                {editingProduct ? '保存修改' : '添加商品'}
+              </Button>
             </Space>
           </Form.Item>
         </Form>
