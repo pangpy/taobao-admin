@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Image } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { productAPI } from '../api/product';
+import { cartAPI } from '../api/cart';
 import { Product } from '../types';
 
 const { Option } = Select;
@@ -64,6 +65,51 @@ const Products: React.FC = () => {
     }
   };
 
+  // 加入购物车
+  const handleAddToCart = async (product: Product) => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      message.warning('请先登录');
+      navigate('/login');
+      return;
+    }
+    
+    const user = JSON.parse(userStr);
+    if (!user.id) {
+      message.warning('请先登录');
+      navigate('/login');
+      return;
+    }
+    
+    // 检查库存
+    if (product.stock <= 0) {
+      message.warning('商品库存不足');
+      return;
+    }
+    
+    try {
+      const res = await cartAPI.addToCart({
+        user_id: user.id,
+        product_id: product.id!,
+        product_name: product.name,
+        product_price: product.price,
+        quantity: 1,
+        product_image: product.images?.split(',')[0] || ''
+      });
+      
+      console.log('加入购物车响应:', res);
+      
+      if (res && res.code === 200) {
+        message.success('已添加到购物车');
+      } else {
+        message.error(res?.message || '添加失败');
+      }
+    } catch (error) {
+      console.error('加入购物车失败:', error);
+      message.error('添加失败，请重试');
+    }
+  };
+
   const handleAdd = () => {
     setEditingProduct(null);
     form.resetFields();
@@ -78,7 +124,6 @@ const Products: React.FC = () => {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    // 使用 setTimeout 确保 Modal 打开后再设置表单值
     setModalVisible(true);
     setTimeout(() => {
       form.setFieldsValue({
@@ -235,11 +280,19 @@ const Products: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       render: (_: any, record: Product) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
+          </Button>
+          <Button 
+            type="link" 
+            icon={<ShoppingCartOutlined />} 
+            onClick={() => handleAddToCart(record)}
+            disabled={record.stock <= 0}
+          >
+            {record.stock > 0 ? '加入购物车' : '缺货'}
           </Button>
           <Popconfirm 
             title="确定删除吗？" 
