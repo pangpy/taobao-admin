@@ -1,0 +1,112 @@
+/* 移动端适配样式 */
+
+/* 侧滑动画 */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* 手机端断点 */
+@media (max-width: 768px) {
+  /* 全局背景 */
+  body {
+    background-color: #f5f5f5;
+  }
+
+  /* 容器内边距减小 */
+  .ant-layout-content,
+  .ant-layout {
+    padding: 12px !important;
+  }
+
+  /* 卡片优化 */
+  .ant-card {
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  .ant-card-body {
+    padding: 12px;
+  }
+
+  /* 表格横向滚动（关键） */
+  .ant-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ant-table {
+    min-width: 600px;
+  }
+
+  /* 表单纵向排列 */
+  .ant-form-item {
+    flex-direction: column;
+    margin-bottom: 16px;
+  }
+  .ant-form-item-label {
+    text-align: left;
+    padding-bottom: 4px;
+  }
+
+  /* 按钮触屏优化 */
+  .ant-btn {
+    height: 40px;
+    border-radius: 8px;
+  }
+
+  /* 搜索栏 */
+  .ant-input-search .ant-input-group {
+    display: flex;
+  }
+  .ant-input-search .ant-input,
+  .ant-input-search-button {
+    height: 40px;
+  }
+
+  /* 模态框 */
+  .ant-modal {
+    max-width: calc(100% - 32px);
+    margin: 16px;
+  }
+  .ant-modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  /* 分页 */
+  .ant-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .ant-pagination-item,
+  .ant-pagination-prev,
+  .ant-pagination-next {
+    min-width: 36px;
+    height: 36px;
+    line-height: 34px;
+  }
+
+  /* 触屏点击区域 */
+  button,
+  .ant-btn,
+  [role="button"] {
+    min-height: 44px;
+  }
+  
+  /* 防止iOS自动缩放 */
+  input,
+  .ant-input,
+  .ant-picker,
+  .ant-select-selector {
+    font-size: 16px !important;
+  }
+}

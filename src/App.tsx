@@ -9,9 +9,12 @@ import Cart from './pages/Cart';
 import Orders from './pages/Orders';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Profile from './pages/Profile';  // ✅ 添加导入
+import Profile from './pages/Profile';
 import { User } from './types';
 import { initAuthSDK } from './api/sdkHelper';
+
+// ✅ 新增：引入移动端样式
+import './styles/mobile.css';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -57,7 +60,6 @@ const App: React.FC = () => {
             <Route path="products" element={user ? <Products /> : <Navigate to="/login" />} />
             <Route path="cart" element={user ? <Cart /> : <Navigate to="/login" />} />
             <Route path="orders" element={user ? <Orders /> : <Navigate to="/login" />} />
-            {/* ✅ 添加个人中心路由 */}
             <Route path="profile" element={user ? <Profile /> : <Navigate to="/login" />} />
           </Route>
         </Routes>
