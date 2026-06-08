@@ -1,4 +1,4 @@
-/* src/styles/mobile.css - 移动端完整适配样式 */
+/* src/styles/mobile.css - 移动端自适应样式（无需滚动） */
 
 /* 侧滑动画 */
 @keyframes slideIn {
@@ -14,39 +14,103 @@
   animation: slideIn 0.3s ease-out;
 }
 
-/* 移动端适配 */
+/* 移动端适配 - 内容自动适应，无需横向滚动 */
 @media (max-width: 768px) {
-  /* 全局样式 */
-  body {
-    font-size: 14px;
-    overflow-x: auto;
-    background-color: #f5f5f5;
+  /* 全局 - 禁止横向滚动 */
+  body,
+  html {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100vw !important;
   }
 
-  /* 主容器横向滚动 */
-  .ant-layout-content {
-    overflow-x: auto !important;
+  /* 所有容器禁止超出 */
+  * {
+    max-width: 100vw;
+    box-sizing: border-box;
   }
 
-  /* 表格容器可以横向滚动 - 核心修复 */
+  /* 主容器 */
+  .ant-layout,
+  .ant-layout-content,
+  .ant-layout-sider,
+  .ant-layout-header {
+    overflow-x: hidden !important;
+  }
+
+  /* 表格 - 在移动端隐藏，用卡片代替 */
   .ant-table-wrapper {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    margin-bottom: 16px;
+    overflow-x: hidden !important;
   }
-
-  /* 表格不自动换行，保持完整宽度 */
+  
+  /* 移动端隐藏原生表格（改用卡片） */
   .ant-table {
-    width: max-content !important;
-    min-width: 100%;
+    display: none !important;
   }
 
-  /* 表格单元格文字不换行 */
-  .ant-table-cell {
-    white-space: nowrap !important;
+  /* 移动端卡片列表样式 */
+  .mobile-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  /* 卡片占满宽度 */
+  .mobile-product-card {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    display: flex;
+    gap: 12px;
+  }
+
+  .mobile-product-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #f0f0f0;
+  }
+
+  .mobile-product-info {
+    flex: 1;
+  }
+
+  .mobile-product-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+
+  .mobile-product-price {
+    font-size: 18px;
+    color: #ff4d4f;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .mobile-product-meta {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 10px;
+  }
+
+  .mobile-product-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .mobile-product-actions button {
+    flex: 1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+  }
+
+  /* 卡片样式 */
   .ant-card {
     width: 100% !important;
     border-radius: 12px;
@@ -73,15 +137,16 @@
   .ant-select,
   .ant-picker,
   .ant-input-number,
-  .ant-input-affix-wrapper {
+  .ant-input-affix-wrapper,
+  .ant-select-selector {
     width: 100% !important;
   }
 
   /* 按钮触屏优化 */
   .ant-btn {
-    height: 40px;
+    height: 44px;
     border-radius: 8px;
-    min-height: 40px;
+    min-height: 44px;
   }
 
   /* 按钮组换行 */
@@ -89,17 +154,17 @@
     flex-wrap: wrap;
   }
 
-  /* 搜索栏 */
+  /* 搜索栏占满 */
   .ant-input-search .ant-input-group {
     display: flex;
   }
 
   .ant-input-search .ant-input,
   .ant-input-search-button {
-    height: 40px;
+    height: 44px;
   }
 
-  /* 模态框适配屏幕 */
+  /* 模态框适配 */
   .ant-modal {
     max-width: calc(100% - 32px) !important;
     margin: 16px !important;
@@ -125,7 +190,7 @@
     width: 100% !important;
   }
 
-  /* 分页组件适配 */
+  /* 分页适配 */
   .ant-pagination {
     display: flex;
     flex-wrap: wrap;
@@ -136,9 +201,9 @@
   .ant-pagination-item,
   .ant-pagination-prev,
   .ant-pagination-next {
-    min-width: 36px;
-    height: 36px;
-    line-height: 34px;
+    min-width: 40px;
+    height: 40px;
+    line-height: 38px;
   }
 
   /* 触屏点击区域最小44px */
@@ -157,25 +222,75 @@
     font-size: 16px !important;
   }
 
-  /* 描述列表 */
-  .ant-descriptions-item-label,
-  .ant-descriptions-item-content {
-    white-space: normal !important;
-    word-break: break-word;
+  /* 订单卡片 */
+  .mobile-order-card {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
 
-  /* 统计卡片网格 */
-  .stat-card-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+  .mobile-order-header {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .mobile-order-no {
+    font-size: 12px;
+    color: #666;
+  }
+
+  .mobile-order-status {
+    font-size: 12px;
+    color: #ff4d4f;
+  }
+
+  .mobile-order-amount {
+    font-size: 16px;
+    font-weight: bold;
+    color: #ff4d4f;
+    text-align: right;
+  }
+
+  /* 购物车卡片 */
+  .mobile-cart-item {
+    display: flex;
     gap: 12px;
+    padding: 12px;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 12px;
   }
 
-  /* 购物车数量角标 */
-  .ant-badge-count {
-    font-size: 10px;
-    min-width: 16px;
-    height: 16px;
-    line-height: 16px;
+  .mobile-cart-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    background: #f0f0f0;
   }
+
+  .mobile-cart-info {
+    flex: 1;
+  }
+
+  /* 隐藏 PC 端专用元素 */
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* PC 端隐藏移动端专用元素 */
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* 移动端显示专用类 */
+.mobile-only {
+  display: none;
 }

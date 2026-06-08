@@ -52,9 +52,9 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout }) => {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Header user={user} onLogout={onLogout} cartCount={cartCount} isMobile={isMobile} />
       
-      {/* main 内容区 - 移动端允许横向滚动 */}
-      <main className={`flex-1 ${isMobile ? 'px-3 py-3' : 'container mx-auto px-4 py-8'}`}>
-        <Outlet />
+      {/* main 内容区 - 移动端占满全宽，无横向滚动 */}
+      <main className={`flex-1 ${isMobile ? 'px-3 py-3 w-full overflow-x-hidden' : 'container mx-auto px-4 py-8'}`}>
+        <Outlet context={{ isMobile }} />
       </main>
       
       {isMobile ? (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Image } from 'antd';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Image, Card, Avatar, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { productAPI } from '../api/product';
 import { cartAPI } from '../api/cart';
@@ -10,6 +10,7 @@ const { Option } = Select;
 
 const Products: React.FC = () => {
   const navigate = useNavigate();
+  const { isMobile } = useOutletContext<{ isMobile: boolean }>() || { isMobile: false };
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -220,6 +221,7 @@ const Products: React.FC = () => {
     return firstImage || null;
   };
 
+  // ========== PC 端表格列定义 ==========
   const columns = [
     {
       title: '图片',
@@ -288,19 +290,20 @@ const Products: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 220,
+      width: 240,
       render: (_: any, record: Product) => (
-        <Space>
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+        <Space size="small">
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
           <Button 
             type="link" 
+            size="small"
             icon={<ShoppingCartOutlined />} 
             onClick={() => handleAddToCart(record)}
             disabled={record.stock <= 0}
           >
-            {record.stock > 0 ? '加入购物车' : '缺货'}
+            {record.stock > 0 ? '加购' : '缺货'}
           </Button>
           <Popconfirm 
             title="确定删除吗？" 
@@ -308,7 +311,7 @@ const Products: React.FC = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -317,138 +320,155 @@ const Products: React.FC = () => {
     }
   ];
 
+  // ========== 移动端卡片组件 ==========
+  const MobileProductCard = ({ product }: { product: Product }) => {
+    const imageUrl = getImageUrl(product.images);
+    
+    return (
+      <Card 
+        className="mb-3 rounded-xl shadow-sm"
+        bodyStyle={{ padding: '12px' }}
+      >
+        <div className="flex gap-3">
+          {/* 商品图片 */}
+          <div className="w-20 h-20 flex-shrink-0">
+            {imageUrl ? (
+              <img 
+                src={imageUrl} 
+                alt={product.name}
+                className="w-full h-full object-cover rounded-lg"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/4F46E5/white?text=商品';
+                }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+                无图
+              </div>
+            )}
+          </div>
+          
+          {/* 商品信息 */}
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-base text-gray-800 truncate">
+              {product.name}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              分类：{product.category || '未分类'}
+            </div>
+            <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+              <span className="text-red-500 text-lg font-bold">
+                ¥{product.price?.toFixed(2)}
+              </span>
+              {product.original_price && product.original_price > product.price && (
+                <span className="text-gray-400 text-xs line-through">
+                  ¥{product.original_price.toFixed(2)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+              <span>库存：{product.stock}</span>
+              <span>销量：{product.sales || 0}</span>
+              <Tag color={product.status === 'on' ? 'green' : 'red'} className="m-0">
+                {product.status === 'on' ? '在售' : '下架'}
+              </Tag>
+            </div>
+          </div>
+        </div>
+        
+        {/* 操作按钮 */}
+        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+          <Button 
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(product)}
+            className="flex-1"
+          >
+            编辑
+          </Button>
+          <Button 
+            size="small"
+            icon={<ShoppingCartOutlined />}
+            onClick={() => handleAddToCart(product)}
+            disabled={product.stock <= 0}
+            type={product.stock > 0 ? 'primary' : 'default'}
+            className="flex-1"
+          >
+            {product.stock > 0 ? '加入购物车' : '缺货'}
+          </Button>
+          <Popconfirm 
+            title="确定删除吗？" 
+            onConfirm={() => handleDelete(product.id!)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button 
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              className="flex-1"
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </div>
+      </Card>
+    );
+  };
+
+  // 加载状态
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <Spin size="large" tip="加载中..." />
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">商品管理</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+      {/* 头部 */}
+      <div className={`mb-4 flex ${isMobile ? 'flex-col gap-3' : 'justify-between items-center'}`}>
+        <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`}>商品管理</h1>
+        <Button 
+          type="primary" 
+          icon={<PlusOutlined />} 
+          onClick={handleAdd}
+          block={isMobile}
+        >
           添加商品
         </Button>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={products}
-        rowKey="id"
-        loading={loading}
-        pagination={{ pageSize: 10, showTotal: (total) => `共 ${total} 条` }}
-        locale={{ emptyText: '暂无商品数据，点击"添加商品"创建' }}
-      />
-
-      <Modal
-        title={editingProduct ? '编辑商品' : '添加商品'}
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={null}
-        width={600}
-        destroyOnClose
-      >
-        <Form 
-          form={form}
-          layout="vertical" 
-          onFinish={handleSubmit}
-          initialValues={{
-            status: 'on',
-            stock: 0,
-            price: 0,
-            original_price: 0
-          }}
-        >
-          <Form.Item 
-            name="name" 
-            label="商品名称" 
-            rules={[{ required: true, message: '请输入商品名称' }]}
-          >
-            <Input placeholder="请输入商品名称" />
-          </Form.Item>
-          
-          <Form.Item name="description" label="商品描述">
-            <Input.TextArea rows={3} placeholder="请输入商品描述" />
-          </Form.Item>
-          
-          <Form.Item 
-            name="category" 
-            label="分类" 
-            rules={[{ required: true, message: '请选择分类' }]}
-          >
-            <Select placeholder="请选择分类">
-              <Option value="电子产品">电子产品</Option>
-              <Option value="服装鞋包">服装鞋包</Option>
-              <Option value="家居用品">家居用品</Option>
-              <Option value="食品饮料">食品饮料</Option>
-              <Option value="美妆个护">美妆个护</Option>
-              <Option value="母婴用品">母婴用品</Option>
-            </Select>
-          </Form.Item>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item 
-              name="price" 
-              label="售价" 
-              rules={[{ required: true, message: '请输入售价' }]}
-            >
-              <InputNumber 
-                min={0} 
-                precision={2} 
-                className="w-full" 
-                placeholder="0.00"
-                prefix="¥"
-              />
-            </Form.Item>
-            
-            <Form.Item name="original_price" label="原价">
-              <InputNumber 
-                min={0} 
-                precision={2} 
-                className="w-full" 
-                placeholder="0.00"
-                prefix="¥"
-              />
-            </Form.Item>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item 
-              name="stock" 
-              label="库存" 
-              rules={[{ required: true, message: '请输入库存' }]}
-            >
-              <InputNumber min={0} className="w-full" placeholder="0" />
-            </Form.Item>
-            
-            <Form.Item 
-              name="status" 
-              label="状态" 
-              rules={[{ required: true, message: '请选择状态' }]}
-            >
-              <Select>
-                <Option value="on">在售</Option>
-                <Option value="off">下架</Option>
-              </Select>
-            </Form.Item>
-          </div>
-          
-          <Form.Item 
-            name="images" 
-            label="图片URL" 
-            tooltip="支持单张图片或多张图片（用逗号分隔）"
-          >
-            <Input.TextArea 
-              rows={2} 
-              placeholder="https://placehold.co/300x300/4F46E5/white?text=Product" 
-            />
-          </Form.Item>
-          
-          <Form.Item>
-            <Space className="w-full justify-end">
-              <Button onClick={() => setModalVisible(false)}>取消</Button>
-              <Button type="primary" htmlType="submit">
-                {editingProduct ? '保存修改' : '添加商品'}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* 根据设备类型显示不同视图 */}
+      {isMobile ? (
+        // 移动端：卡片列表
+        <div className="space-y-3">
+          {products.length === 0 ? (
+            <div className="text-center py-20 text-gray-400">
+              暂无商品数据
+              <div className="mt-2">
+                <Button type="link" onClick={handleAdd}>点击添加商品</Button>
+              </div>
+            </div>
+          ) : (
+            products.map((product) => (
+              <MobileProductCard key={product.id} product={product} />
+            ))
+          )}
+        </div>
+      ) : (
+        // PC 端：表格
+        <Table
+          columns={columns}
+          dataSource={products}
+          rowKey="id"
+          loading={loading}
+          pagination={{ pageSize: 10, showTotal: (total) => `共 ${total} 条` }}
+          locale={{ emptyText: '暂无商品数据，点击"添加商品"创建' }}
+          scroll={{ x: 1100 }}
+        />
+      )}
     </div>
   );
 };
