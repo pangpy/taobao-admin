@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Image, Card, Avatar, Spin } from 'antd';
+import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Tag, Image, Card, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { productAPI } from '../api/product';
 import { cartAPI } from '../api/cart';
@@ -469,6 +469,110 @@ const Products: React.FC = () => {
           scroll={{ x: 1100 }}
         />
       )}
+
+      {/* 添加/编辑商品弹窗 */}
+      <Modal
+        title={editingProduct ? '编辑商品' : '添加商品'}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        onOk={() => form.submit()}
+        width={600}
+        destroyOnClose
+        okText="保存"
+        cancelText="取消"
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+        >
+          <Form.Item
+            name="name"
+            label="商品名称"
+            rules={[{ required: true, message: '请输入商品名称' }]}
+          >
+            <Input placeholder="请输入商品名称" />
+          </Form.Item>
+          
+          <Form.Item
+            name="description"
+            label="商品描述"
+          >
+            <Input.TextArea rows={4} placeholder="请输入商品描述" />
+          </Form.Item>
+          
+          <Form.Item
+            name="category"
+            label="分类"
+            rules={[{ required: true, message: '请选择分类' }]}
+          >
+            <Select placeholder="请选择分类">
+              <Option value="电子产品">电子产品</Option>
+              <Option value="服装">服装</Option>
+              <Option value="食品">食品</Option>
+              <Option value="图书">图书</Option>
+              <Option value="其他">其他</Option>
+            </Select>
+          </Form.Item>
+          
+          <Form.Item
+            name="price"
+            label="价格"
+            rules={[{ required: true, message: '请输入价格' }]}
+          >
+            <InputNumber
+              min={0}
+              precision={2}
+              prefix="¥"
+              placeholder="请输入价格"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="original_price"
+            label="原价"
+          >
+            <InputNumber
+              min={0}
+              precision={2}
+              prefix="¥"
+              placeholder="请输入原价（可选）"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="stock"
+            label="库存"
+            rules={[{ required: true, message: '请输入库存' }]}
+          >
+            <InputNumber
+              min={0}
+              placeholder="请输入库存数量"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="images"
+            label="图片地址"
+          >
+            <Input placeholder="请输入图片地址，多个用逗号分隔" />
+          </Form.Item>
+          
+          <Form.Item
+            name="status"
+            label="状态"
+            rules={[{ required: true, message: '请选择状态' }]}
+          >
+            <Select placeholder="请选择商品状态">
+              <Option value="on">在售</Option>
+              <Option value="off">下架</Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
