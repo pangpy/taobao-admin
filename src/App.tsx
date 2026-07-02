@@ -33,7 +33,7 @@ const App: React.FC = () => {
         accessToken: accessToken
       });
     } else {
-      console.warn('请配置环境变量: VITE_API_ACCOUNT, VITE_TOTP_SECRET, VITE_ACCESS_TOKEN');
+      console.warn('请配置环境变量123: VITE_API_ACCOUNT, VITE_TOTP_SECRET, VITE_ACCESS_TOKEN');
     }
     
     const token = localStorage.getItem('token');
