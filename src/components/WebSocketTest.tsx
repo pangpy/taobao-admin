@@ -1,6 +1,5 @@
-// components/WebSocketTest.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Input, Card, Space, Alert, Typography, List, Tag } from 'antd';
+import { Button, Input, Card, Alert, Typography, List, Tag } from 'antd';
 import { WifiOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -13,7 +12,6 @@ interface Message {
 }
 
 const WebSocketTest: React.FC = () => {
-  const [ws, setWs] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -23,7 +21,6 @@ const WebSocketTest: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 获取 token
   const getToken = () => {
@@ -38,19 +35,14 @@ const WebSocketTest: React.FC = () => {
       return;
     }
 
-    const wsUrl = `ws://apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
+    const wsUrl = `ws://localhost:8002/api/wsproxy?token=${token}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
     addLog(`🔗 正在连接: ${wsUrl}`);
 
     const websocket = new WebSocket(wsUrl);
 
-    // 添加 Authorization header（WebSocket 不支持自定义 header，通过协议参数传递）
-    // 或者通过 query 参数传递 token
-    // 注意：你的后端需要支持从 query 参数读取 token
-
     websocket.onopen = () => {
       setIsConnected(true);
       addLog('✅ WebSocket 连接成功');
-      setWs(websocket);
       wsRef.current = websocket;
     };
 
@@ -78,7 +70,6 @@ const WebSocketTest: React.FC = () => {
     websocket.onclose = () => {
       addLog('🔌 WebSocket 连接关闭');
       setIsConnected(false);
-      setWs(null);
       wsRef.current = null;
     };
   };
@@ -90,7 +81,6 @@ const WebSocketTest: React.FC = () => {
       wsRef.current = null;
     }
     setIsConnected(false);
-    setWs(null);
     addLog('🔌 主动断开连接');
   };
 
@@ -144,9 +134,6 @@ const WebSocketTest: React.FC = () => {
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
-      }
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
       }
     };
   }, []);
