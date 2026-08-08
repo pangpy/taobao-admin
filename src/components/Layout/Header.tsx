@@ -8,7 +8,8 @@ import {
   ShoppingCartOutlined,
   DashboardOutlined,
   AppstoreOutlined,
-  MenuOutlined
+  MenuOutlined,
+  MessageOutlined
 } from '@ant-design/icons';
 import { User } from '../../types';
 
@@ -16,7 +17,7 @@ interface HeaderProps {
   user: User | null;
   onLogout: () => void;
   cartCount?: number;
-  isMobile?: boolean;  // ✅ 新增
+  isMobile?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout, cartCount = 0, isMobile = false }) => {
@@ -128,6 +129,20 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, cartCount = 0, isMobile
                       <span>商品管理</span>
                     </button>
                     <button 
+                      onClick={() => { navigate('/cart'); setMobileMenuOpen(false); }}
+                      className="flex items-center space-x-3 w-full py-3 px-3 rounded-lg hover:bg-gray-100"
+                    >
+                      <ShoppingCartOutlined />
+                      <span>购物车</span>
+                    </button>
+                    <button 
+                      onClick={() => { navigate('/ws-test'); setMobileMenuOpen(false); }}
+                      className="flex items-center space-x-3 w-full py-3 px-3 rounded-lg hover:bg-gray-100"
+                    >
+                      <MessageOutlined />
+                      <span>💬 聊天</span>
+                    </button>
+                    <button 
                       onClick={() => { navigate('/orders'); setMobileMenuOpen(false); }}
                       className="flex items-center space-x-3 w-full py-3 px-3 rounded-lg hover:bg-gray-100"
                     >
@@ -167,7 +182,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, cartCount = 0, isMobile
     );
   }
 
-  // ========== PC 端 Header（保持原样） ==========
+  // ========== PC 端 Header ==========
   return (
     <header className="bg-gradient-to-r from-orange-500 to-red-500 shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
@@ -211,6 +226,15 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, cartCount = 0, isMobile
                 购物车
               </Button>
             </Badge>
+
+            <Button 
+              type="text" 
+              icon={<MessageOutlined />}
+              onClick={() => navigate('/ws-test')}
+              className="text-white hover:bg-orange-600"
+            >
+              💬 聊天
+            </Button>
             
             {user ? (
               <Dropdown menu={{ items: menuItems }} placement="bottomRight">
