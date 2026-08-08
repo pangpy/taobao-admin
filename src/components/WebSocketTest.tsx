@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Alert, Typography, List, Tag } from 'antd';
 import { WifiOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons';
+import { getDynamicHeaders } from './sdkHelper';
 
 const { Text } = Typography;
 
@@ -22,56 +23,65 @@ const WebSocketTest: React.FC = () => {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  // 获取 token
-  const getToken = () => {
-    return localStorage.getItem('access_token') || '';
+  // 添加日志
+  const addLog = (log: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs(prev => [...prev, `[${timestamp}] ${log}`]);
   };
 
   // 连接 WebSocket
-  const connectWebSocket = () => {
-    const token = getToken();
-    if (!token) {
-      addLog('❌ 请先登录获取 token');
-      return;
-    }
-
-    const wsUrl = `ws://apiscode.org/api/wsproxy?token=${token}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
-    addLog(`🔗 正在连接: ${wsUrl}`);
-
-    const websocket = new WebSocket(wsUrl);
-
-    websocket.onopen = () => {
-      setIsConnected(true);
-      addLog('✅ WebSocket 连接成功');
-      wsRef.current = websocket;
-    };
-
-    websocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        addLog(`📩 收到消息: ${event.data.substring(0, 100)}...`);
-        
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: data.type === 'ack' ? 'ack' : 'received',
-          content: JSON.stringify(data, null, 2),
-          timestamp: new Date()
-        }]);
-      } catch (e) {
-        addLog(`📩 收到原始消息: ${event.data}`);
+  const connectWebSocket = async () => {
+    try {
+      // 1. 获取动态认证头
+      const headers = await getDynamicHeaders();
+      const authHeader = headers['Authorization'] || '';
+      const token = authHeader.replace('Bearer ', '');
+      
+      if (!token) {
+        addLog('❌ 无法获取认证 token，请先登录');
+        return;
       }
-    };
 
-    websocket.onerror = (error) => {
-      addLog(`❌ WebSocket 错误: ${error}`);
-      setIsConnected(false);
-    };
+      // 2. 通过 URL 参数传递 token
+      const wsUrl = `wss://api.apiscode.org/api/wsproxy?token=${token}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
+      addLog(`🔗 正在连接: ${wsUrl}`);
 
-    websocket.onclose = () => {
-      addLog('🔌 WebSocket 连接关闭');
-      setIsConnected(false);
-      wsRef.current = null;
-    };
+      const websocket = new WebSocket(wsUrl);
+
+      websocket.onopen = () => {
+        setIsConnected(true);
+        addLog('✅ WebSocket 连接成功');
+        wsRef.current = websocket;
+      };
+
+      websocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          addLog(`📩 收到消息: ${event.data.substring(0, 100)}...`);
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: data.type === 'ack' ? 'ack' : 'received',
+            content: JSON.stringify(data, null, 2),
+            timestamp: new Date()
+          }]);
+        } catch (e) {
+          addLog(`📩 收到原始消息: ${event.data}`);
+        }
+      };
+
+      websocket.onerror = (error) => {
+        addLog(`❌ WebSocket 错误: ${error}`);
+        setIsConnected(false);
+      };
+
+      websocket.onclose = () => {
+        addLog('🔌 WebSocket 连接关闭');
+        setIsConnected(false);
+        wsRef.current = null;
+      };
+    } catch (error) {
+      addLog(`❌ 获取认证信息失败: ${error}`);
+    }
   };
 
   // 断开连接
@@ -116,12 +126,6 @@ const WebSocketTest: React.FC = () => {
     } catch (e) {
       addLog(`❌ 发送失败: ${e}`);
     }
-  };
-
-  // 添加日志
-  const addLog = (log: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev, `[${timestamp}] ${log}`]);
   };
 
   // 清理日志
