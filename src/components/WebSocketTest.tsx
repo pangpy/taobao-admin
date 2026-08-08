@@ -17,7 +17,7 @@ const WebSocketTest: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [roomId, setRoomId] = useState('test-room-001');
-  const [subUserId, setSubUserId] = useState('1');
+  const [subUserId, setSubUserId] = useState('3');
   const [role, setRole] = useState('admin');
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -32,18 +32,19 @@ const WebSocketTest: React.FC = () => {
   // 连接 WebSocket
   const connectWebSocket = async () => {
     try {
-      // 1. 获取动态认证头
       const headers = await getDynamicHeaders();
       const authHeader = headers['Authorization'] || '';
       const token = authHeader.replace('Bearer ', '');
+      const xAccount = headers['X-Account'] || '';
+      const xTotp = headers['X-TOTP'] || '';
       
-      if (!token) {
-        addLog('❌ 无法获取认证 token，请先登录');
+      if (!token || !xAccount || !xTotp) {
+        addLog('❌ 无法获取完整认证信息，请先登录');
         return;
       }
 
-      // 2. 通过 URL 参数传递 token
-      const wsUrl = `wss://api.apiscode.org/api/wsproxy?token=${token}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
+      // ✅ URL 参数传递所有认证信息
+      const wsUrl = `wss://api.apiscode.org/api/wsproxy?token=${encodeURIComponent(token)}&x_account=${encodeURIComponent(xAccount)}&x_totp=${encodeURIComponent(xTotp)}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
       addLog(`🔗 正在连接: ${wsUrl}`);
 
       const websocket = new WebSocket(wsUrl);
