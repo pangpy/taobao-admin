@@ -44,13 +44,10 @@ const WebSocketTest: React.FC = () => {
         return;
       }
 
-      // 2. 通过 Sec-WebSocket-Protocol 传递认证信息（和 Header 一样）
-      // 格式: token,x_account,x_totp 然后 base64 编码
-      const authString = `${token},${xAccount},${xTotp}`;
-      const authBase64 = btoa(authString);
-      const protocols = ['auth', authBase64];
+      // ✅ 三个独立的子协议，不合并，不编码
+      const protocols = ['auth', token, xAccount, xTotp];
       
-      // 3. URL 中只保留业务参数，不包含认证信息
+      // URL 中只保留业务参数
       const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
       addLog(`🔗 正在连接: ${wsUrl}`);
 
