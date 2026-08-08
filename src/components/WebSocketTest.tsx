@@ -35,7 +35,7 @@ const WebSocketTest: React.FC = () => {
       return;
     }
 
-    const wsUrl = `ws://localhost:8002/api/wsproxy?token=${token}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
+    const wsUrl = `ws://apiscode.org/api/wsproxy?token=${token}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
     addLog(`🔗 正在连接: ${wsUrl}`);
 
     const websocket = new WebSocket(wsUrl);
