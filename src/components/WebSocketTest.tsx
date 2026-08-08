@@ -32,6 +32,7 @@ const WebSocketTest: React.FC = () => {
   // 连接 WebSocket
   const connectWebSocket = async () => {
     try {
+      // 1. 获取和增删改查一样的认证头
       const headers = await getDynamicHeaders();
       const authHeader = headers['Authorization'] || '';
       const token = authHeader.replace('Bearer ', '');
@@ -43,11 +44,17 @@ const WebSocketTest: React.FC = () => {
         return;
       }
 
-      // ✅ URL 参数传递所有认证信息
-      const wsUrl = `wss://api.apiscode.org/api/wsproxy?token=${encodeURIComponent(token)}&x_account=${encodeURIComponent(xAccount)}&x_totp=${encodeURIComponent(xTotp)}&sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
+      // 2. 通过 Sec-WebSocket-Protocol 传递认证信息（和 Header 一样）
+      // 格式: token,x_account,x_totp 然后 base64 编码
+      const authString = `${token},${xAccount},${xTotp}`;
+      const authBase64 = btoa(authString);
+      const protocols = ['auth', authBase64];
+      
+      // 3. URL 中只保留业务参数，不包含认证信息
+      const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
       addLog(`🔗 正在连接: ${wsUrl}`);
 
-      const websocket = new WebSocket(wsUrl);
+      const websocket = new WebSocket(wsUrl, protocols);
 
       websocket.onopen = () => {
         setIsConnected(true);
