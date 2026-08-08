@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Alert, Typography, List, Tag } from 'antd';
 import { WifiOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons';
-import { getDynamicHeaders } from './sdkHelper';
+import { getDynamicHeaders } from '../api/sdkHelper';
 
 const { Text } = Typography;
 
