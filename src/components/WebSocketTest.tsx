@@ -338,7 +338,7 @@ const WebSocketTest: React.FC = () => {
 
       const token = getUploadToken();
 
-      const response = await fetch('https://api.apiscode.org/upload', {
+      const response = await fetch('https://api.apiscode.org/api/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
