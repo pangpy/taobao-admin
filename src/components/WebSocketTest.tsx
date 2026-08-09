@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Typography, Upload, message, Image } from 'antd';
-
+// ✅ 正确版本（只比之前少一个 FileImageOutlined）
+import { SendOutlined, UserOutlined, PlusOutlined, FilePdfOutlined, FileWordOutlined, FileOutlined, VideoCameraOutlined, PhoneOutlined, AudioMutedOutlined } from '@ant-design/icons';
 const { Text } = Typography;
 
 interface Message {
