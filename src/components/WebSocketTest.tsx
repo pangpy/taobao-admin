@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Input, Card, Tag, Typography } from 'antd';
+import { Button, Input, Card, Typography } from 'antd';
 import { SendOutlined, UserOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -156,34 +156,63 @@ const WebSocketTest: React.FC = () => {
   };
 
   // ============================================================
-  // 渲染消息列表
+  // 渲染消息（微信风格：自己发送的在右边，接收的在左边）
   // ============================================================
   const renderMessages = (messages: Message[], userKey: UserKey) => {
     const currentUser = USER_CONFIGS[userKey];
-    const otherUser = userKey === 'userA' ? USER_CONFIGS.userB : USER_CONFIGS.userA;
     
     return (
-      <div className="h-64 overflow-y-auto border rounded p-2 bg-gray-50 mt-1">
+      <div className="h-80 overflow-y-auto p-3 bg-gray-100 rounded-lg">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-400 text-sm py-8">暂无消息，开始聊天吧</div>
+          <div className="text-center text-gray-400 text-sm py-12">暂无消息，开始聊天吧 💬</div>
         ) : (
           messages.map((item) => {
-            const isSent = item.type === 'sent';
-            const isAck = item.type === 'ack';
-            const label = isSent ? `${currentUser.name} → ${otherUser.name}` : 
-                          isAck ? '✅ 已送达' : 
-                          `${otherUser.name} → ${currentUser.name}`;
-            const color: 'blue' | 'green' | 'orange' = isSent ? 'blue' : isAck ? 'green' : 'orange';
-            
-            return (
-              <div key={item.id} className="flex justify-between items-start border-b border-gray-100 py-1.5 px-2 hover:bg-gray-100">
-                <div className="flex-1">
-                  <Tag color={color}>{label}</Tag>
-                  <span className="text-sm ml-1">{item.content}</span>
+            // ack 消息不显示气泡
+            if (item.type === 'ack') {
+              return (
+                <div key={item.id} className="text-center text-xs text-gray-400 py-1">
+                  {item.content}
                 </div>
-                <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                  {item.timestamp.toLocaleTimeString()}
-                </span>
+              );
+            }
+
+            const isSent = item.type === 'sent' || 
+              (item.type === 'received' && item.fromUserId === currentUser.id);
+            
+            // 判断消息方向
+            const isMine = isSent || (item.fromUserId === currentUser.id);
+            const displayContent = item.content;
+            const time = item.timestamp.toLocaleTimeString();
+
+            return (
+              <div key={item.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}>
+                {!isMine && (
+                  <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mr-2">
+                    {USER_CONFIGS[userKey === 'userA' ? 'userB' : 'userA'].name.substring(0, 1)}
+                  </div>
+                )}
+                <div className={`max-w-[70%] ${isMine ? 'order-2' : 'order-1'}`}>
+                  {!isMine && (
+                    <div className="text-xs text-gray-500 mb-0.5">
+                      {USER_CONFIGS[userKey === 'userA' ? 'userB' : 'userA'].name}
+                    </div>
+                  )}
+                  <div className={`rounded-lg px-3 py-2 break-words ${
+                    isMine 
+                      ? 'bg-blue-500 text-white rounded-br-none' 
+                      : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
+                  }`}>
+                    {displayContent}
+                  </div>
+                  <div className={`text-xs text-gray-400 mt-0.5 ${isMine ? 'text-right' : 'text-left'}`}>
+                    {time}
+                  </div>
+                </div>
+                {isMine && (
+                  <div className="w-8 h-8 rounded-full bg-green-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ml-2 order-3">
+                    {currentUser.name.substring(0, 1)}
+                  </div>
+                )}
               </div>
             );
           })
