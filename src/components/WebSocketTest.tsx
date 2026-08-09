@@ -169,7 +169,10 @@ const WebSocketTest: React.FC = () => {
           }
           if (data.type === 'webrtc_accept') {
             const currentUserKey: UserKey = isA ? 'userA' : 'userB';
-            startWebRTC(currentUserKey, isA ? callTypeA === 'video' : callTypeB === 'video', true);
+            const withVideo = isA ? callTypeA === 'video' : callTypeB === 'video';
+            if (isA) setVideoOnA(withVideo);
+            else setVideoOnB(withVideo);
+            startWebRTC(currentUserKey, withVideo, true);
             return;
           }
           if (data.type === 'webrtc_reject') {
@@ -287,8 +290,8 @@ const WebSocketTest: React.FC = () => {
   // ============================================================
   const startCall = (userKey: UserKey, withVideo: boolean) => {
     const isA = userKey === 'userA';
-    if (isA) { setInCallA(true); setCallTypeA(withVideo ? 'video' : 'audio'); }
-    else { setInCallB(true); setCallTypeB(withVideo ? 'video' : 'audio'); }
+    if (isA) { setInCallA(true); setCallTypeA(withVideo ? 'video' : 'audio'); setVideoOnA(withVideo); }
+    else { setInCallB(true); setCallTypeB(withVideo ? 'video' : 'audio'); setVideoOnB(withVideo); }
     sendSignal(userKey, 'webrtc_call', { video: withVideo });
   };
 
@@ -297,10 +300,11 @@ const WebSocketTest: React.FC = () => {
   // ============================================================
   const acceptCall = (userKey: UserKey) => {
     const isA = userKey === 'userA';
-    if (isA) setIncomingCallA(false);
-    else setIncomingCallB(false);
+    const withVideo = isA ? callTypeA === 'video' : callTypeB === 'video';
+    if (isA) { setIncomingCallA(false); setVideoOnA(withVideo); }
+    else { setIncomingCallB(false); setVideoOnB(withVideo); }
     sendSignal(userKey, 'webrtc_accept', {});
-    startWebRTC(userKey, isA ? callTypeA === 'video' : callTypeB === 'video', false);
+    startWebRTC(userKey, withVideo, false);
   };
 
   // ============================================================
@@ -542,7 +546,9 @@ const WebSocketTest: React.FC = () => {
               {remoteVideo ? (
                 <video ref={remoteVideoRef} autoPlay playsInline className="w-full rounded-lg" style={{ maxHeight: 200 }} />
               ) : (
-                <div className="flex items-center justify-center h-48 text-white text-sm">{videoOn ? '等待对方视频...' : '语音通话中...'}</div>
+                <div className="flex items-center justify-center h-48 text-white text-sm">
+                  {videoOn ? '等待对方视频...' : '语音通话中...'}
+                </div>
               )}
               {videoOn && (
                 <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-2 right-2 w-24 h-18 rounded border-2 border-white bg-gray-800 object-cover" />
