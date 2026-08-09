@@ -160,6 +160,7 @@ const WebSocketTest: React.FC = () => {
   // ============================================================
   const renderMessages = (messages: Message[], userKey: UserKey) => {
     const currentUser = USER_CONFIGS[userKey];
+    const otherUser = userKey === 'userA' ? USER_CONFIGS.userB : USER_CONFIGS.userA;
     
     return (
       <div className="h-80 overflow-y-auto p-3 bg-gray-100 rounded-lg">
@@ -179,22 +180,23 @@ const WebSocketTest: React.FC = () => {
             const isSent = item.type === 'sent' || 
               (item.type === 'received' && item.fromUserId === currentUser.id);
             
-            // 判断消息方向
             const isMine = isSent || (item.fromUserId === currentUser.id);
             const displayContent = item.content;
             const time = item.timestamp.toLocaleTimeString();
+            const senderName = isMine ? currentUser.name : otherUser.name;
+            const displayName = senderName.length > 10 ? senderName.substring(0, 10) + '...' : senderName;
 
             return (
               <div key={item.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}>
                 {!isMine && (
                   <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mr-2">
-                    {USER_CONFIGS[userKey === 'userA' ? 'userB' : 'userA'].name.substring(0, 1)}
+                    {displayName.charAt(0)}
                   </div>
                 )}
                 <div className={`max-w-[70%] ${isMine ? 'order-2' : 'order-1'}`}>
                   {!isMine && (
-                    <div className="text-xs text-gray-500 mb-0.5">
-                      {USER_CONFIGS[userKey === 'userA' ? 'userB' : 'userA'].name}
+                    <div className="text-xs text-gray-500 mb-0.5 ml-1">
+                      {displayName}
                     </div>
                   )}
                   <div className={`rounded-lg px-3 py-2 break-words ${
@@ -210,7 +212,7 @@ const WebSocketTest: React.FC = () => {
                 </div>
                 {isMine && (
                   <div className="w-8 h-8 rounded-full bg-green-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ml-2 order-3">
-                    {currentUser.name.substring(0, 1)}
+                    {displayName.charAt(0)}
                   </div>
                 )}
               </div>
