@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Input, Card, Typography, Upload, message, Modal, Image } from 'antd';
+import { Button, Input, Card, Typography, Upload, message, Image } from 'antd';
 import { SendOutlined, UserOutlined, PlusOutlined, FileImageOutlined } from '@ant-design/icons';
-import type { UploadFile } from 'antd/es/upload/interface';
 
 const { Text } = Typography;
 
@@ -45,7 +44,6 @@ const isImageFile = (mime?: string, name?: string): boolean => {
 // 获取上传凭证（从环境变量或API获取）
 // ============================================================
 const getUploadToken = (): string => {
-  // 这里需要替换为实际的token获取方式
   return import.meta.env.VITE_ACCESS_TOKEN || localStorage.getItem('access_token') || '';
 };
 
