@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Typography, Upload, message, Image } from 'antd';
-import { SendOutlined, UserOutlined, PlusOutlined, FileImageOutlined, FilePdfOutlined, FileWordOutlined, FileOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { SendOutlined, UserOutlined, PlusOutlined, FileImageOutlined, FilePdfOutlined, FileWordOutlined, FileOutlined, VideoCameraOutlined, PhoneOutlined, AudioMutedOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -92,6 +92,27 @@ const WebSocketTest: React.FC = () => {
 
   const [roomId, setRoomId] = useState('test-room-001');
 
+  // ============ WebRTC 语音通话状态 ============
+  const [inCallA, setInCallA] = useState(false);
+  const [mutedA, setMutedA] = useState(false);
+  const pcRefA = useRef<RTCPeerConnection | null>(null);
+  const localStreamRefA = useRef<MediaStream | null>(null);
+
+  const [inCallB, setInCallB] = useState(false);
+  const [mutedB, setMutedB] = useState(false);
+  const pcRefB = useRef<RTCPeerConnection | null>(null);
+  const localStreamRefB = useRef<MediaStream | null>(null);
+
+  // ============================================================
+  // WebRTC 配置
+  // ============================================================
+  const rtcConfig: RTCConfiguration = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+    ],
+  };
+
   // ============================================================
   // 通用连接函数
   // ============================================================
@@ -119,6 +140,7 @@ const WebSocketTest: React.FC = () => {
       websocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+
           // 处理文件消息
           if (data.type === 'file') {
             const msg: Message = {
@@ -138,6 +160,13 @@ const WebSocketTest: React.FC = () => {
             } else {
               setMessagesB(prev => [...prev, msg]);
             }
+            return;
+          }
+
+          // 处理 WebRTC 信令
+          if (['webrtc_offer', 'webrtc_answer', 'webrtc_ice'].includes(data.type)) {
+            const currentUserKey: UserKey = isA ? 'userA' : 'userB';
+            handleSignal(currentUserKey, data);
             return;
           }
 
@@ -190,6 +219,112 @@ const WebSocketTest: React.FC = () => {
   };
 
   // ============================================================
+  // 发送信令
+  // ============================================================
+  const sendSignal = (userKey: UserKey, type: string, payload: any) => {
+    const wsRef = userKey === 'userA' ? wsRefA : wsRefB;
+    const targetUser = userKey === 'userA' ? USER_CONFIGS.userB : USER_CONFIGS.userA;
+    wsRef.current?.send(JSON.stringify({
+      type,
+      payload,
+      to_user_id: targetUser.id,
+      to_role: targetUser.role,
+    }));
+  };
+
+  // ============================================================
+  // 处理信令
+  // ============================================================
+  const handleSignal = async (userKey: UserKey, data: any) => {
+    const pcRef = userKey === 'userA' ? pcRefA : pcRefB;
+    const pc = pcRef.current;
+    if (!pc) return;
+
+    try {
+      if (data.type === 'webrtc_offer') {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.payload));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendSignal(userKey, 'webrtc_answer', answer);
+      } else if (data.type === 'webrtc_answer') {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.payload));
+      } else if (data.type === 'webrtc_ice') {
+        await pc.addIceCandidate(new RTCIceCandidate(data.payload));
+      }
+    } catch (e) {
+      console.error('信令处理失败:', e);
+    }
+  };
+
+  // ============================================================
+  // 发起/接听通话
+  // ============================================================
+  const startCall = async (userKey: UserKey) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (userKey === 'userA') {
+        localStreamRefA.current = stream;
+      } else {
+        localStreamRefB.current = stream;
+      }
+
+      const pc = new RTCPeerConnection(rtcConfig);
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          sendSignal(userKey, 'webrtc_ice', event.candidate);
+        }
+      };
+
+      pc.ontrack = (event) => {
+        const audio = new Audio();
+        audio.srcObject = event.streams[0];
+        audio.autoplay = true;
+      };
+
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      if (userKey === 'userA') pcRefA.current = pc;
+      else pcRefB.current = pc;
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendSignal(userKey, 'webrtc_offer', offer);
+
+      if (userKey === 'userA') setInCallA(true);
+      else setInCallB(true);
+    } catch (e) {
+      message.error('无法访问麦克风');
+    }
+  };
+
+  // ============================================================
+  // 挂断
+  // ============================================================
+  const hangUp = (userKey: UserKey) => {
+    const pcRef = userKey === 'userA' ? pcRefA : pcRefB;
+    const localStreamRef = userKey === 'userA' ? localStreamRefA : localStreamRefB;
+    const setInCall = userKey === 'userA' ? setInCallA : setInCallB;
+
+    pcRef.current?.close();
+    pcRef.current = null;
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    setInCall(false);
+  };
+
+  // ============================================================
+  // 静音
+  // ============================================================
+  const toggleMute = (userKey: UserKey) => {
+    const localStreamRef = userKey === 'userA' ? localStreamRefA : localStreamRefB;
+    localStreamRef.current?.getAudioTracks().forEach(t => {
+      t.enabled = !t.enabled;
+    });
+    if (userKey === 'userA') setMutedA(!mutedA);
+    else setMutedB(!mutedB);
+  };
+
+  // ============================================================
   // 上传文件到后端
   // ============================================================
   const uploadFile = async (file: File, userKey: UserKey): Promise<{ url: string; filename: string; size: number; mime: string } | null> => {
@@ -202,7 +337,7 @@ const WebSocketTest: React.FC = () => {
       formData.append('file', file);
 
       const token = getUploadToken();
-      
+
       const response = await fetch('https://api.apiscode.org/upload', {
         method: 'POST',
         headers: {
@@ -279,15 +414,13 @@ const WebSocketTest: React.FC = () => {
   // 处理文件选择
   // ============================================================
   const handleFileSelect = async (file: File, userKey: UserKey) => {
-    // 文件大小限制 2MB
     if (file.size > 2 * 1024 * 1024) {
       message.error('文件大小不能超过2MB');
       return false;
     }
 
-    // 显示上传提示
     const hide = message.loading('正在上传...', 0);
-    
+
     const result = await uploadFile(file, userKey);
     hide();
 
@@ -296,7 +429,7 @@ const WebSocketTest: React.FC = () => {
       message.success('文件发送成功');
     }
 
-    return false; // 阻止默认上传行为
+    return false;
   };
 
   // ============================================================
@@ -341,7 +474,6 @@ const WebSocketTest: React.FC = () => {
   // 渲染文件内容（根据类型）
   // ============================================================
   const renderFileContent = (item: Message) => {
-    // 图片：直接显示缩略图，点击放大
     if (isImageFile(item.fileMime, item.fileName) && item.fileUrl) {
       return (
         <Image
@@ -354,7 +486,6 @@ const WebSocketTest: React.FC = () => {
       );
     }
 
-    // 视频：内嵌播放器
     if (isVideoFile(item.fileMime, item.fileName) && item.fileUrl) {
       return (
         <div className="w-full max-w-[280px]">
@@ -374,7 +505,6 @@ const WebSocketTest: React.FC = () => {
       );
     }
 
-    // PDF / Word / 其他文件：可点击下载的卡片
     return (
       <div
         className="flex items-center gap-2 p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors"
@@ -407,7 +537,6 @@ const WebSocketTest: React.FC = () => {
           <div className="text-center text-gray-400 text-sm py-12">暂无消息，开始聊天吧 💬</div>
         ) : (
           messages.map((item) => {
-            // ack 消息不显示气泡
             if (item.type === 'ack') {
               return (
                 <div key={item.id} className="text-center text-xs text-gray-400 py-1">
@@ -416,12 +545,11 @@ const WebSocketTest: React.FC = () => {
               );
             }
 
-            const isMine = item.type === 'sent' || item.type === 'file' || 
+            const isMine = item.type === 'sent' || item.type === 'file' ||
               (item.fromUserId === currentUser.id);
             const displayName = isMine ? currentUser.name : otherUser.name;
             const time = item.timestamp.toLocaleTimeString();
 
-            // 文件消息
             if (item.type === 'file') {
               return (
                 <div key={item.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}>
@@ -450,7 +578,6 @@ const WebSocketTest: React.FC = () => {
               );
             }
 
-            // 普通文本消息
             const displayContent = item.content;
             return (
               <div key={item.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}>
@@ -464,8 +591,8 @@ const WebSocketTest: React.FC = () => {
                     <div className="text-xs text-gray-500 mb-0.5 ml-1">{displayName}</div>
                   )}
                   <div className={`rounded-lg px-3 py-2 break-words ${
-                    isMine 
-                      ? 'bg-blue-500 text-white rounded-br-none' 
+                    isMine
+                      ? 'bg-blue-500 text-white rounded-br-none'
                       : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
                   }`}>
                     {displayContent}
@@ -499,9 +626,11 @@ const WebSocketTest: React.FC = () => {
     const setInputMessage = isA ? setInputMessageA : setInputMessageB;
     const uploading = isA ? uploadingA : uploadingB;
     const targetUser = isA ? USER_CONFIGS.userB : USER_CONFIGS.userA;
+    const inCall = isA ? inCallA : inCallB;
+    const muted = isA ? mutedA : mutedB;
 
     return (
-      <Card 
+      <Card
         title={
           <div className="flex justify-between items-center">
             <span><UserOutlined /> {user.name} (ID:{user.id})</span>
@@ -531,10 +660,27 @@ const WebSocketTest: React.FC = () => {
             <span>对话: {targetUser.name}</span>
           </div>
 
+          {/* ============ 语音通话按钮 ============ */}
+          <div className="flex gap-2 mb-2">
+            {isConnected && (
+              !inCall ? (
+                <Button icon={<PhoneOutlined />} onClick={() => startCall(userKey)}>
+                  语音通话
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button icon={<AudioMutedOutlined />} onClick={() => toggleMute(userKey)}>
+                    {muted ? '取消静音' : '静音'}
+                  </Button>
+                  <Button danger onClick={() => hangUp(userKey)}>挂断</Button>
+                </div>
+              )
+            )}
+          </div>
+
           {renderMessages(messages, userKey)}
 
           <div className="flex gap-2 mt-2">
-            {/* ============ + 号上传按钮 ============ */}
             <Upload
               showUploadList={false}
               beforeUpload={(file) => handleFileSelect(file, userKey)}
