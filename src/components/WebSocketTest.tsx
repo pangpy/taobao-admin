@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Alert, Typography, List, Tag } from 'antd';
 import { WifiOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons';
-import { getDynamicHeaders } from '../api/sdkHelper';
 
 const { Text } = Typography;
 
@@ -23,46 +22,45 @@ const WebSocketTest: React.FC = () => {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  // 添加日志
-  const addLog = (log: string) => {
+  const addLog = (log: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `[${timestamp}] ${log}`]);
   };
 
-  // 连接 WebSocket
-  const connectWebSocket = async () => {
+  const connectWebSocket = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      addLog('⚠️ 已经连接了', 'info');
+      return;
+    }
+
     try {
-      // 1. 获取和增删改查一样的认证头
-      const headers = await getDynamicHeaders();
-      const authHeader = headers['Authorization'] || '';
-      const token = authHeader.replace('Bearer ', '');
-      const xAccount = headers['X-Account'] || '';
-      const xTotp = headers['X-TOTP'] || '';
+      // ✅ 直接从环境变量取 token
+      const token = import.meta.env.VITE_ACCESS_TOKEN;
       
-      if (!token || !xAccount || !xTotp) {
-        addLog('❌ 无法获取完整认证信息，请先登录');
+      if (!token) {
+        addLog('❌ 没有 token，请检查 .env 文件', 'error');
         return;
       }
 
-      // ✅ 三个独立的子协议，不合并，不编码
-      const protocols = ['auth', token, xAccount, xTotp];
-      
-      // URL 中只保留业务参数
-      const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}`;
-      addLog(`🔗 正在连接: ${wsUrl}`);
+      addLog(`✅ token: ${token.substring(0, 30)}...`, 'success');
+      addLog(`📏 token 长度: ${token.length} 字符`, 'info');
 
-      const websocket = new WebSocket(wsUrl, protocols);
+      // ✅ 只传 token，不传 xAccount/xTotp
+      const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}&token=${encodeURIComponent(token)}`;
+      addLog(`🔗 正在连接: ${wsUrl}`, 'info');
+
+      const websocket = new WebSocket(wsUrl);
 
       websocket.onopen = () => {
         setIsConnected(true);
-        addLog('✅ WebSocket 连接成功');
+        addLog('✅ WebSocket 连接成功！', 'success');
         wsRef.current = websocket;
       };
 
       websocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          addLog(`📩 收到消息: ${event.data.substring(0, 100)}...`);
+          addLog(`📩 收到消息: ${event.data.substring(0, 100)}...`, 'info');
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
             type: data.type === 'ack' ? 'ack' : 'received',
@@ -70,44 +68,43 @@ const WebSocketTest: React.FC = () => {
             timestamp: new Date()
           }]);
         } catch (e) {
-          addLog(`📩 收到原始消息: ${event.data}`);
+          addLog(`📩 收到原始消息: ${event.data}`, 'info');
         }
       };
 
       websocket.onerror = (error) => {
-        addLog(`❌ WebSocket 错误: ${error}`);
+        addLog(`❌ WebSocket 错误: ${error}`, 'error');
         setIsConnected(false);
       };
 
-      websocket.onclose = () => {
-        addLog('🔌 WebSocket 连接关闭');
+      websocket.onclose = (event) => {
         setIsConnected(false);
+        addLog(`🔌 WebSocket 连接关闭 (code: ${event.code}, reason: ${event.reason})`, 'error');
         wsRef.current = null;
       };
+
     } catch (error) {
-      addLog(`❌ 获取认证信息失败: ${error}`);
+      addLog(`❌ 连接失败: ${error}`, 'error');
     }
   };
 
-  // 断开连接
   const disconnectWebSocket = () => {
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
     setIsConnected(false);
-    addLog('🔌 主动断开连接');
+    addLog('🔌 主动断开连接', 'info');
   };
 
-  // 发送消息
   const sendMessage = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      addLog('❌ WebSocket 未连接');
+      addLog('❌ WebSocket 未连接', 'error');
       return;
     }
 
     if (!inputMessage.trim()) {
-      addLog('⚠️ 请输入消息内容');
+      addLog('⚠️ 请输入消息内容', 'info');
       return;
     }
 
@@ -118,7 +115,7 @@ const WebSocketTest: React.FC = () => {
         to_role: 'user'
       };
       wsRef.current.send(JSON.stringify(msg));
-      addLog(`📤 发送: ${inputMessage}`);
+      addLog(`📤 发送: ${inputMessage}`, 'info');
       
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -129,16 +126,14 @@ const WebSocketTest: React.FC = () => {
       
       setInputMessage('');
     } catch (e) {
-      addLog(`❌ 发送失败: ${e}`);
+      addLog(`❌ 发送失败: ${e}`, 'error');
     }
   };
 
-  // 清理日志
   const clearLogs = () => {
     setLogs([]);
   };
 
-  // 清理连接
   useEffect(() => {
     return () => {
       if (wsRef.current) {
@@ -150,7 +145,6 @@ const WebSocketTest: React.FC = () => {
   return (
     <div className="p-4 max-w-6xl mx-auto">
       <Card title="🔌 WebSocket 测试工具" className="shadow-lg">
-        {/* 连接配置 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <Text type="secondary">房间 ID</Text>
@@ -192,7 +186,6 @@ const WebSocketTest: React.FC = () => {
           </div>
         </div>
 
-        {/* 连接状态 */}
         <div className="mb-4">
           {isConnected ? (
             <Alert message="✅ 已连接" type="success" showIcon />
@@ -201,7 +194,6 @@ const WebSocketTest: React.FC = () => {
           )}
         </div>
 
-        {/* 消息发送 */}
         <div className="flex gap-2 mb-4">
           <Input
             value={inputMessage}
@@ -215,7 +207,6 @@ const WebSocketTest: React.FC = () => {
           </Button>
         </div>
 
-        {/* 消息列表和日志 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Text strong>📋 消息记录 ({messages.length})</Text>
