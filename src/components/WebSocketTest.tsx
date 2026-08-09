@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Typography, Upload, message, Image } from 'antd';
-import { SendOutlined, UserOutlined, PlusOutlined, FileImageOutlined } from '@ant-design/icons';
+import { SendOutlined, UserOutlined, PlusOutlined, FileImageOutlined, FilePdfOutlined, FileWordOutlined, FileOutlined, VideoCameraOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -32,7 +32,7 @@ const USER_CONFIGS = {
 type UserKey = 'userA' | 'userB';
 
 // ============================================================
-// 判断文件类型是否为图片
+// 判断文件类型
 // ============================================================
 const isImageFile = (mime?: string, name?: string): boolean => {
   if (mime && mime.startsWith('image/')) return true;
@@ -40,8 +40,36 @@ const isImageFile = (mime?: string, name?: string): boolean => {
   return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
 };
 
+const isVideoFile = (mime?: string, name?: string): boolean => {
+  if (mime && mime.startsWith('video/')) return true;
+  const ext = name?.split('.').pop()?.toLowerCase();
+  return ['mp4', 'mov', 'webm', 'avi'].includes(ext || '');
+};
+
+const isPdfFile = (mime?: string, name?: string): boolean => {
+  if (mime === 'application/pdf') return true;
+  const ext = name?.split('.').pop()?.toLowerCase();
+  return ext === 'pdf';
+};
+
+const isWordFile = (mime?: string, name?: string): boolean => {
+  if (mime && (mime.includes('word') || mime.includes('msword') || mime.includes('document'))) return true;
+  const ext = name?.split('.').pop()?.toLowerCase();
+  return ['doc', 'docx'].includes(ext || '');
+};
+
 // ============================================================
-// 获取上传凭证（从环境变量或API获取）
+// 文件图标组件
+// ============================================================
+const FileIcon: React.FC<{ fileName?: string; fileMime?: string }> = ({ fileName, fileMime }) => {
+  if (isPdfFile(fileMime, fileName)) return <FilePdfOutlined className="text-2xl text-red-500" />;
+  if (isWordFile(fileMime, fileName)) return <FileWordOutlined className="text-2xl text-blue-600" />;
+  if (isVideoFile(fileMime, fileName)) return <VideoCameraOutlined className="text-2xl text-purple-500" />;
+  return <FileOutlined className="text-2xl text-gray-500" />;
+};
+
+// ============================================================
+// 获取上传凭证
 // ============================================================
 const getUploadToken = (): string => {
   return import.meta.env.VITE_ACCESS_TOKEN || localStorage.getItem('access_token') || '';
@@ -310,6 +338,63 @@ const WebSocketTest: React.FC = () => {
   };
 
   // ============================================================
+  // 渲染文件内容（根据类型）
+  // ============================================================
+  const renderFileContent = (item: Message) => {
+    // 图片：直接显示缩略图，点击放大
+    if (isImageFile(item.fileMime, item.fileName) && item.fileUrl) {
+      return (
+        <Image
+          src={item.fileUrl}
+          alt={item.fileName}
+          className="max-w-full rounded cursor-pointer"
+          style={{ maxHeight: 200 }}
+          preview={{ mask: '点击查看大图' }}
+        />
+      );
+    }
+
+    // 视频：内嵌播放器
+    if (isVideoFile(item.fileMime, item.fileName) && item.fileUrl) {
+      return (
+        <div className="w-full max-w-[280px]">
+          <video
+            controls
+            className="w-full rounded"
+            style={{ maxHeight: 200 }}
+            preload="metadata"
+          >
+            <source src={item.fileUrl} type={item.fileMime || 'video/mp4'} />
+            您的浏览器不支持视频播放
+          </video>
+          <div className="text-xs text-gray-400 mt-1 truncate">
+            {item.fileName}
+          </div>
+        </div>
+      );
+    }
+
+    // PDF / Word / 其他文件：可点击下载的卡片
+    return (
+      <div
+        className="flex items-center gap-2 p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors"
+        onClick={() => item.fileUrl && window.open(item.fileUrl, '_blank')}
+        title="点击打开/下载文件"
+      >
+        <FileIcon fileName={item.fileName} fileMime={item.fileMime} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">
+            {item.fileName || '未知文件'}
+          </div>
+          <div className="text-xs text-gray-400">
+            {item.fileSize ? `${(item.fileSize / 1024).toFixed(1)} KB` : ''}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
   // 渲染消息（微信风格 + 文件消息）
   // ============================================================
   const renderMessages = (messages: Message[], userKey: UserKey) => {
@@ -338,7 +423,6 @@ const WebSocketTest: React.FC = () => {
 
             // 文件消息
             if (item.type === 'file') {
-              const isImage = isImageFile(item.fileMime, item.fileName);
               return (
                 <div key={item.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-2`}>
                   {!isMine && (
@@ -351,27 +435,7 @@ const WebSocketTest: React.FC = () => {
                       <div className="text-xs text-gray-500 mb-0.5 ml-1">{displayName}</div>
                     )}
                     <div className={`rounded-lg p-2 ${isMine ? 'bg-blue-500 text-white' : 'bg-white shadow-sm'}`}>
-                      {isImage && item.fileUrl ? (
-                        <Image
-                          src={item.fileUrl}
-                          alt={item.fileName}
-                          className="max-w-full rounded cursor-pointer"
-                          style={{ maxHeight: 200 }}
-                          preview={{ mask: '点击查看大图' }}
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                          <FileImageOutlined className="text-2xl text-blue-500" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">
-                              {item.fileName || '未知文件'}
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {item.fileSize ? `${(item.fileSize / 1024).toFixed(1)} KB` : ''}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      {renderFileContent(item)}
                     </div>
                     <div className={`text-xs text-gray-400 mt-0.5 ${isMine ? 'text-right' : 'text-left'}`}>
                       {time}
