@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, Typography, Upload, message, Image } from 'antd';
-import { SendOutlined, UserOutlined, PlusOutlined, FileImageOutlined, FilePdfOutlined, FileWordOutlined, FileOutlined, VideoCameraOutlined, PhoneOutlined, AudioMutedOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
