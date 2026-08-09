@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Input, Card, Tag, Tabs } from 'antd';
-import { WifiOutlined, SendOutlined, CloseOutlined, UserOutlined } from '@ant-design/icons';
+import { Button, Input, Card, Tag, Typography } from 'antd';
+import { SendOutlined, UserOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -173,12 +173,12 @@ const WebSocketTest: React.FC = () => {
             const label = isSent ? `${currentUser.name} → ${otherUser.name}` : 
                           isAck ? '✅ 已送达' : 
                           `${otherUser.name} → ${currentUser.name}`;
-            const color = isSent ? 'blue' : isAck ? 'green' : 'orange';
+            const color: 'blue' | 'green' | 'orange' = isSent ? 'blue' : isAck ? 'green' : 'orange';
             
             return (
               <div key={item.id} className="flex justify-between items-start border-b border-gray-100 py-1.5 px-2 hover:bg-gray-100">
                 <div className="flex-1">
-                  <Tag color={color} size="small">{label}</Tag>
+                  <Tag color={color}>{label}</Tag>
                   <span className="text-sm ml-1">{item.content}</span>
                 </div>
                 <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
