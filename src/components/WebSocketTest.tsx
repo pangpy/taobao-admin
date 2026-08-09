@@ -545,7 +545,8 @@ const WebSocketTest: React.FC = () => {
               );
             }
 
-            const isMine = item.type === 'sent' || item.type === 'file' ||
+            const isMine = item.type === 'sent' ||
+              (item.type === 'file' && item.fromUserId === currentUser.id) ||
               (item.fromUserId === currentUser.id);
             const displayName = isMine ? currentUser.name : otherUser.name;
             const time = item.timestamp.toLocaleTimeString();
