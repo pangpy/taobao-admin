@@ -11,6 +11,12 @@ interface Message {
   timestamp: Date;
 }
 
+// ✅ 安全显示 token（只显示前6位和后6位）
+const maskToken = (token: string): string => {
+  if (!token || token.length < 12) return '***';
+  return `${token.substring(0, 6)}...${token.substring(token.length - 6)}`;
+};
+
 const WebSocketTest: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -41,11 +47,13 @@ const WebSocketTest: React.FC = () => {
         return;
       }
 
-      addLog(`✅ token: ${token.substring(0, 30)}...`);
+      // ✅ 只显示 token 前后几位
+      addLog(`✅ token: ${maskToken(token)}`);
       addLog(`📏 token 长度: ${token.length} 字符`);
 
       const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}&token=${encodeURIComponent(token)}`;
-      addLog(`🔗 正在连接: ${wsUrl}`);
+      // ✅ URL 中也隐藏 token
+      addLog(`🔗 正在连接: ${wsUrl.replace(token, maskToken(token))}`);
 
       const websocket = new WebSocket(wsUrl);
 
