@@ -22,45 +22,43 @@ const WebSocketTest: React.FC = () => {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  const addLog = (log: string, type: 'info' | 'success' | 'error' = 'info') => {
+  const addLog = (log: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `[${timestamp}] ${log}`]);
   };
 
   const connectWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      addLog('⚠️ 已经连接了', 'info');
+      addLog('⚠️ 已经连接了');
       return;
     }
 
     try {
-      // ✅ 直接从环境变量取 token
       const token = import.meta.env.VITE_ACCESS_TOKEN;
       
       if (!token) {
-        addLog('❌ 没有 token，请检查 .env 文件', 'error');
+        addLog('❌ 没有 token，请检查 .env 文件');
         return;
       }
 
-      addLog(`✅ token: ${token.substring(0, 30)}...`, 'success');
-      addLog(`📏 token 长度: ${token.length} 字符`, 'info');
+      addLog(`✅ token: ${token.substring(0, 30)}...`);
+      addLog(`📏 token 长度: ${token.length} 字符`);
 
-      // ✅ 只传 token，不传 xAccount/xTotp
       const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${subUserId}&role=${role}&room_id=${roomId}&token=${encodeURIComponent(token)}`;
-      addLog(`🔗 正在连接: ${wsUrl}`, 'info');
+      addLog(`🔗 正在连接: ${wsUrl}`);
 
       const websocket = new WebSocket(wsUrl);
 
       websocket.onopen = () => {
         setIsConnected(true);
-        addLog('✅ WebSocket 连接成功！', 'success');
+        addLog('✅ WebSocket 连接成功！');
         wsRef.current = websocket;
       };
 
       websocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          addLog(`📩 收到消息: ${event.data.substring(0, 100)}...`, 'info');
+          addLog(`📩 收到消息: ${event.data.substring(0, 100)}...`);
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
             type: data.type === 'ack' ? 'ack' : 'received',
@@ -68,23 +66,23 @@ const WebSocketTest: React.FC = () => {
             timestamp: new Date()
           }]);
         } catch (e) {
-          addLog(`📩 收到原始消息: ${event.data}`, 'info');
+          addLog(`📩 收到原始消息: ${event.data}`);
         }
       };
 
       websocket.onerror = (error) => {
-        addLog(`❌ WebSocket 错误: ${error}`, 'error');
+        addLog(`❌ WebSocket 错误: ${error}`);
         setIsConnected(false);
       };
 
       websocket.onclose = (event) => {
         setIsConnected(false);
-        addLog(`🔌 WebSocket 连接关闭 (code: ${event.code}, reason: ${event.reason})`, 'error');
+        addLog(`🔌 WebSocket 连接关闭 (code: ${event.code}, reason: ${event.reason})`);
         wsRef.current = null;
       };
 
     } catch (error) {
-      addLog(`❌ 连接失败: ${error}`, 'error');
+      addLog(`❌ 连接失败: ${error}`);
     }
   };
 
@@ -94,17 +92,17 @@ const WebSocketTest: React.FC = () => {
       wsRef.current = null;
     }
     setIsConnected(false);
-    addLog('🔌 主动断开连接', 'info');
+    addLog('🔌 主动断开连接');
   };
 
   const sendMessage = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      addLog('❌ WebSocket 未连接', 'error');
+      addLog('❌ WebSocket 未连接');
       return;
     }
 
     if (!inputMessage.trim()) {
-      addLog('⚠️ 请输入消息内容', 'info');
+      addLog('⚠️ 请输入消息内容');
       return;
     }
 
@@ -115,7 +113,7 @@ const WebSocketTest: React.FC = () => {
         to_role: 'user'
       };
       wsRef.current.send(JSON.stringify(msg));
-      addLog(`📤 发送: ${inputMessage}`, 'info');
+      addLog(`📤 发送: ${inputMessage}`);
       
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -126,7 +124,7 @@ const WebSocketTest: React.FC = () => {
       
       setInputMessage('');
     } catch (e) {
-      addLog(`❌ 发送失败: ${e}`, 'error');
+      addLog(`❌ 发送失败: ${e}`);
     }
   };
 
