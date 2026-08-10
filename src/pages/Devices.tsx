@@ -1,7 +1,7 @@
 // src/pages/Devices.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Switch, Button, Tag, Typography, Space, message, Input } from 'antd';
-import { ReloadOutlined, ThunderboltOutlined, BulbOutlined, WifiOutlined } from '@ant-design/icons';
+import { Card, Switch, Button, Tag, Typography, Space, message, Input, Drawer } from 'antd';
+import { ReloadOutlined, ThunderboltOutlined, BulbOutlined, WifiOutlined, ToolOutlined } from '@ant-design/icons';
 import mqtt from 'mqtt';
 
 const { Text, Title } = Typography;
@@ -35,6 +35,16 @@ const Devices: React.FC = () => {
   const [tcpHost, setTcpHost] = useState('api.apiscode.org');
   const [tcpPort, setTcpPort] = useState('1883');
   const clientRef = useRef<mqtt.MqttClient | null>(null);
+
+  // 模拟器状态
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [simTemp, setSimTemp] = useState(26.5);
+  const [simHum, setSimHum] = useState(65.2);
+  const [simLight, setSimLight] = useState(320);
+  const [simDeviceId, setSimDeviceId] = useState('device1');
+  const [simRelay1, setSimRelay1] = useState(false);
+  const [simRelay2, setSimRelay2] = useState(false);
+  const simClientRef = useRef<mqtt.MqttClient | null>(null);
 
   const getBrokerUrl = () => {
     if (connectType === 'ws') {
@@ -109,6 +119,69 @@ const Devices: React.FC = () => {
     return () => { clientRef.current?.end(); };
   }, [connectType]);
 
+  // ============ 模拟器连接 ============
+  const connectSimulator = () => {
+    const token = getToken();
+    if (!token) return;
+
+    if (simClientRef.current) simClientRef.current.end();
+
+    const client = mqtt.connect('wss://api.apiscode.org/mqtt', {
+      username: simDeviceId,
+      password: token,
+      clientId: `sim_${Date.now()}`,
+      clean: true,
+    });
+
+    client.on('connect', () => {
+      message.success('模拟器已连接');
+      client.subscribe(`user/${USER_ID}/${simDeviceId}/command`);
+    });
+
+    client.on('message', (topic: string, payload: Buffer) => {
+      try {
+        const cmd = JSON.parse(payload.toString());
+        if (cmd.action === 'relay') {
+          if (cmd.pin === 1) setSimRelay1(cmd.value === 1);
+          if (cmd.pin === 2) setSimRelay2(cmd.value === 1);
+          message.info(`模拟器: 开关${cmd.pin} ${cmd.value === 1 ? '开' : '关'}`);
+          reportSimStatus(client);
+        }
+      } catch (e) {}
+    });
+
+    simClientRef.current = client;
+  };
+
+  const disconnectSimulator = () => {
+    simClientRef.current?.end();
+    simClientRef.current = null;
+  };
+
+  const reportSimSensor = () => {
+    if (!simClientRef.current) return;
+    const payload = JSON.stringify({
+      temperature: simTemp,
+      humidity: simHum,
+      light: simLight,
+    });
+    simClientRef.current.publish(`user/${USER_ID}/${simDeviceId}/sensor`, payload);
+    message.success('传感器数据已上报');
+  };
+
+  const reportSimStatus = (client?: mqtt.MqttClient) => {
+    const c = client || simClientRef.current;
+    if (!c) return;
+    const payload = JSON.stringify({
+      temperature: simTemp,
+      humidity: simHum,
+      light: simLight,
+      relay1: simRelay1,
+      relay2: simRelay2,
+    });
+    c.publish(`user/${USER_ID}/${simDeviceId}/status`, payload);
+  };
+
   const sendCommand = (deviceId: string, relay: number, value: boolean) => {
     if (!clientRef.current) return;
     const topic = `user/${USER_ID}/${deviceId}/command`;
@@ -131,6 +204,12 @@ const Devices: React.FC = () => {
           <Tag color={connected ? 'green' : 'red'}>
             MQTT {connected ? '已连接' : '未连接'}
           </Tag>
+          <Button icon={<ToolOutlined />} onClick={() => {
+            setSimulatorOpen(true);
+            connectSimulator();
+          }}>
+            模拟器
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={connectMqtt}>
             重连
           </Button>
@@ -159,27 +238,13 @@ const Devices: React.FC = () => {
 
           {connectType === 'tcp' && (
             <Space>
-              <Input
-                value={tcpHost}
-                onChange={(e) => setTcpHost(e.target.value)}
-                placeholder="主机"
-                className="w-40"
-                size="small"
-              />
-              <Input
-                value={tcpPort}
-                onChange={(e) => setTcpPort(e.target.value)}
-                placeholder="端口"
-                className="w-20"
-                size="small"
-              />
+              <Input value={tcpHost} onChange={(e) => setTcpHost(e.target.value)} placeholder="主机" className="w-40" size="small" />
+              <Input value={tcpPort} onChange={(e) => setTcpPort(e.target.value)} placeholder="端口" className="w-20" size="small" />
             </Space>
           )}
 
           <Text type="secondary" className="text-xs">
-            {connectType === 'ws'
-              ? '浏览器直连，走 443 端口'
-              : '直连 TCP，低功耗低延迟'}
+            {connectType === 'ws' ? '浏览器直连，走 443 端口' : '直连 TCP，低功耗低延迟'}
           </Text>
         </div>
       </Card>
@@ -238,18 +303,12 @@ const Devices: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <BulbOutlined className="text-lg" />
                     <span className="text-sm">开关1</span>
-                    <Switch
-                      checked={device.data?.relay1}
-                      onChange={(v) => sendCommand(device.id, 1, v)}
-                    />
+                    <Switch checked={device.data?.relay1} onChange={(v) => sendCommand(device.id, 1, v)} />
                   </div>
                   <div className="flex items-center gap-2">
                     <ThunderboltOutlined className="text-lg" />
                     <span className="text-sm">开关2</span>
-                    <Switch
-                      checked={device.data?.relay2}
-                      onChange={(v) => sendCommand(device.id, 2, v)}
-                    />
+                    <Switch checked={device.data?.relay2} onChange={(v) => sendCommand(device.id, 2, v)} />
                   </div>
                 </div>
               </div>
@@ -257,6 +316,51 @@ const Devices: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* ============ 设备模拟器抽屉 ============ */}
+      <Drawer
+        title="🔧 设备模拟器"
+        open={simulatorOpen}
+        onClose={() => {
+          setSimulatorOpen(false);
+          disconnectSimulator();
+        }}
+        width={400}
+      >
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm text-gray-500 mb-1">设备ID</div>
+            <Input value={simDeviceId} onChange={(e) => setSimDeviceId(e.target.value)} />
+          </div>
+          <div>
+            <div className="text-sm text-gray-500 mb-1">温度 °C</div>
+            <Input type="number" value={simTemp} onChange={(e) => setSimTemp(Number(e.target.value))} />
+          </div>
+          <div>
+            <div className="text-sm text-gray-500 mb-1">湿度 %</div>
+            <Input type="number" value={simHum} onChange={(e) => setSimHum(Number(e.target.value))} />
+          </div>
+          <div>
+            <div className="text-sm text-gray-500 mb-1">光照 lux</div>
+            <Input type="number" value={simLight} onChange={(e) => setSimLight(Number(e.target.value))} />
+          </div>
+          <Button type="primary" block onClick={reportSimSensor}>
+            📤 上报传感器数据
+          </Button>
+
+          <div className="border-t pt-4 mt-4">
+            <div className="text-sm font-medium mb-3">开关状态</div>
+            <div className="flex justify-between items-center mb-2">
+              <span>开关1</span>
+              <Switch checked={simRelay1} onChange={(v) => { setSimRelay1(v); reportSimStatus(); }} />
+            </div>
+            <div className="flex justify-between items-center">
+              <span>开关2</span>
+              <Switch checked={simRelay2} onChange={(v) => { setSimRelay2(v); reportSimStatus(); }} />
+            </div>
+          </div>
+        </div>
+      </Drawer>
     </div>
   );
 };
