@@ -64,18 +64,39 @@ const getUploadToken = (): string => {
   return import.meta.env.VITE_ACCESS_TOKEN || localStorage.getItem('access_token') || '';
 };
 
+const getWSSalt = (): string => {
+  return import.meta.env.VITE_WS_SALT || '';
+};
+
+// SHA256 工具函数
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const WebSocketTest: React.FC = () => {
   const [isConnectedA, setIsConnectedA] = useState(false);
   const [messagesA, setMessagesA] = useState<Message[]>([]);
   const [inputMessageA, setInputMessageA] = useState('');
   const wsRefA = useRef<WebSocket | null>(null);
   const [uploadingA, setUploadingA] = useState(false);
+  // 二次鉴权
+  const [authOkA, setAuthOkA] = useState(false);
+  const connIDRefA = useRef('');
+  const sessionKeyRefA = useRef('');
+  const heartbeatTimerRefA = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [isConnectedB, setIsConnectedB] = useState(false);
   const [messagesB, setMessagesB] = useState<Message[]>([]);
   const [inputMessageB, setInputMessageB] = useState('');
   const wsRefB = useRef<WebSocket | null>(null);
   const [uploadingB, setUploadingB] = useState(false);
+  const [authOkB, setAuthOkB] = useState(false);
+  const connIDRefB = useRef('');
+  const sessionKeyRefB = useRef('');
+  const heartbeatTimerRefB = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [roomId, setRoomId] = useState('test-room-001');
 
@@ -111,7 +132,14 @@ const WebSocketTest: React.FC = () => {
     ],
   };
 
-  // ============ 绑定 video 元素 ============
+  // ============ 心跳 ============
+  const startHeartbeat = (ws: WebSocket, sessionKey: string) => {
+    return setInterval(async () => {
+      // 心跳由服务端发起，客户端只响应
+      // 这里不做主动发送
+    }, 1000);
+  };
+
   useEffect(() => {
     if (localVideoRefA.current && localStreamRefA.current) localVideoRefA.current.srcObject = localStreamRefA.current;
   }, [inCallA]);
@@ -133,6 +161,9 @@ const WebSocketTest: React.FC = () => {
     const isA = userKey === 'userA';
     const setConnected = isA ? setIsConnectedA : setIsConnectedB;
     const wsRef = isA ? wsRefA : wsRefB;
+    const setAuthOk = isA ? setAuthOkA : setAuthOkB;
+    const connIDRef = isA ? connIDRefA : connIDRefB;
+    const sessionKeyRef = isA ? sessionKeyRefA : sessionKeyRefB;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
@@ -141,11 +172,48 @@ const WebSocketTest: React.FC = () => {
       const wsUrl = `wss://api.apiscode.org/api/wsproxy?sub_user_id=${user.id}&role=${user.role}&room_id=${roomId}&token=${encodeURIComponent(token)}`;
       const websocket = new WebSocket(wsUrl);
 
-      websocket.onopen = () => { setConnected(true); wsRef.current = websocket; };
+      websocket.onopen = () => {
+        setConnected(true);
+        wsRef.current = websocket;
+        // 发送二次鉴权
+        const wsSalt = getWSSalt();
+        websocket.send(JSON.stringify({
+          type: 'auth_init',
+          user_salt: wsSalt,
+        }));
+      };
 
-      websocket.onmessage = (event) => {
+      websocket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          // ============ 二次鉴权响应 ============
+          if (data.type === 'auth_ok') {
+            connIDRef.current = data.conn_id;
+            sessionKeyRef.current = data.session_key;
+            setAuthOk(true);
+            console.log('[WS] 二次鉴权通过:', data.conn_id);
+            return;
+          }
+          if (data.type === 'auth_error') {
+            message.error('WebSocket 二次鉴权失败');
+            websocket.close();
+            return;
+          }
+
+          // ============ 心跳挑战 ============
+          if (data.type === 'heartbeat_challenge') {
+            const answer = await sha256(sessionKeyRef.current + data.nonce);
+            websocket.send(JSON.stringify({
+              type: 'heartbeat_response',
+              nonce: data.nonce,
+              answer: answer,
+            }));
+            return;
+          }
+
+          // ============ 未通过二次鉴权，忽略其他消息 ============
+          if (!authOk) return;
 
           // 文件消息
           if (data.type === 'file') {
@@ -161,7 +229,6 @@ const WebSocketTest: React.FC = () => {
             return;
           }
 
-          // ============ WebRTC 呼叫信令 ============
           if (data.type === 'webrtc_call') {
             if (isA) { setIncomingCallA(true); setCallTypeA(data.payload?.video ? 'video' : 'audio'); }
             else { setIncomingCallB(true); setCallTypeB(data.payload?.video ? 'video' : 'audio'); }
@@ -182,7 +249,6 @@ const WebSocketTest: React.FC = () => {
             return;
           }
 
-          // WebRTC SDP/ICE 信令
           if (['webrtc_offer', 'webrtc_answer', 'webrtc_ice'].includes(data.type)) {
             const currentUserKey: UserKey = isA ? 'userA' : 'userB';
             handleSignal(currentUserKey, data);
@@ -201,7 +267,11 @@ const WebSocketTest: React.FC = () => {
       };
 
       websocket.onerror = () => setConnected(false);
-      websocket.onclose = () => { setConnected(false); wsRef.current = null; };
+      websocket.onclose = () => {
+        setConnected(false);
+        setAuthOk(false);
+        wsRef.current = null;
+      };
     } catch (error) {}
   };
 
@@ -209,8 +279,10 @@ const WebSocketTest: React.FC = () => {
     const isA = userKey === 'userA';
     const wsRef = isA ? wsRefA : wsRefB;
     const setConnected = isA ? setIsConnectedA : setIsConnectedB;
+    const setAuthOk = isA ? setAuthOkA : setAuthOkB;
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     setConnected(false);
+    setAuthOk(false);
   };
 
   // ============================================================
@@ -243,9 +315,6 @@ const WebSocketTest: React.FC = () => {
     } catch (e) { console.error('信令处理失败:', e); }
   };
 
-  // ============================================================
-  // 创建 WebRTC 连接（双方都调用）
-  // ============================================================
   const startWebRTC = async (userKey: UserKey, withVideo: boolean, isCaller: boolean) => {
     try {
       const isA = userKey === 'userA';
@@ -285,9 +354,6 @@ const WebSocketTest: React.FC = () => {
     } catch (e) { message.error('无法访问麦克风/摄像头'); }
   };
 
-  // ============================================================
-  // 发起呼叫
-  // ============================================================
   const startCall = (userKey: UserKey, withVideo: boolean) => {
     const isA = userKey === 'userA';
     if (isA) { setInCallA(true); setCallTypeA(withVideo ? 'video' : 'audio'); setVideoOnA(withVideo); }
@@ -295,9 +361,6 @@ const WebSocketTest: React.FC = () => {
     sendSignal(userKey, 'webrtc_call', { video: withVideo });
   };
 
-  // ============================================================
-  // 接听
-  // ============================================================
   const acceptCall = (userKey: UserKey) => {
     const isA = userKey === 'userA';
     const withVideo = isA ? callTypeA === 'video' : callTypeB === 'video';
@@ -307,9 +370,6 @@ const WebSocketTest: React.FC = () => {
     startWebRTC(userKey, withVideo, false);
   };
 
-  // ============================================================
-  // 拒接
-  // ============================================================
   const rejectCall = (userKey: UserKey) => {
     const isA = userKey === 'userA';
     if (isA) { setIncomingCallA(false); setInCallA(false); }
@@ -317,9 +377,6 @@ const WebSocketTest: React.FC = () => {
     sendSignal(userKey, 'webrtc_reject', {});
   };
 
-  // ============================================================
-  // 挂断
-  // ============================================================
   const hangUp = (userKey: UserKey) => {
     const isA = userKey === 'userA';
     const pcRef = isA ? pcRefA : pcRefB;
@@ -353,9 +410,6 @@ const WebSocketTest: React.FC = () => {
     else setVideoOnB(!videoOnB);
   };
 
-  // ============================================================
-  // 上传
-  // ============================================================
   const uploadFile = async (file: File, userKey: UserKey): Promise<{ url: string; filename: string; size: number; mime: string } | null> => {
     const isA = userKey === 'userA';
     const setUploading = isA ? setUploadingA : setUploadingB;
@@ -424,9 +478,6 @@ const WebSocketTest: React.FC = () => {
     } catch (e) {}
   };
 
-  // ============================================================
-  // 渲染
-  // ============================================================
   const renderFileContent = (item: Message) => {
     if (isImageFile(item.fileMime, item.fileName) && item.fileUrl) {
       return <Image src={item.fileUrl} alt={item.fileName} className="max-w-full rounded cursor-pointer" style={{ maxHeight: 200 }} preview={{ mask: '点击查看大图' }} />;
@@ -497,6 +548,7 @@ const WebSocketTest: React.FC = () => {
     const user = USER_CONFIGS[userKey];
     const isA = userKey === 'userA';
     const isConnected = isA ? isConnectedA : isConnectedB;
+    const authOk = isA ? authOkA : authOkB;
     const messages = isA ? messagesA : messagesB;
     const inputMessage = isA ? inputMessageA : inputMessageB;
     const setInputMessage = isA ? setInputMessageA : setInputMessageB;
@@ -513,14 +565,13 @@ const WebSocketTest: React.FC = () => {
 
     return (
       <Card
-        title={<div className="flex justify-between items-center"><span><UserOutlined /> {user.name} (ID:{user.id})</span><span className={isConnected ? 'text-green-500' : 'text-red-500'}>{isConnected ? '🟢 在线' : '🔴 离线'}</span></div>}
+        title={<div className="flex justify-between items-center"><span><UserOutlined /> {user.name} (ID:{user.id})</span><span className={isConnected && authOk ? 'text-green-500' : 'text-red-500'}>{isConnected && authOk ? '🟢 在线' : isConnected ? '🟡 鉴权中' : '🔴 离线'}</span></div>}
         className="h-full"
         extra={<div className="flex gap-2">{!isConnected ? <Button size="small" type="primary" onClick={() => connectUser(userKey)}>连接</Button> : <Button size="small" danger onClick={() => disconnectUser(userKey)}>断开</Button>}</div>}
       >
         <div className="space-y-2">
-          <div className="flex gap-4 text-sm text-gray-500"><span>角色: {user.role}</span><span>对话: {targetUser.name}</span></div>
+          <div className="flex gap-4 text-sm text-gray-500"><span>角色: {user.role}</span><span>对话: {targetUser.name}</span><span>鉴权: {authOk ? '✅' : '⏳'}</span></div>
 
-          {/* ============ 通话区域 ============ */}
           {isConnected && incomingCall ? (
             <div className="flex gap-2 mb-2 p-2 bg-yellow-50 rounded items-center">
               <span className="text-sm flex-1">📞 {targetUser.name} 邀请你{callType === 'video' ? '视频' : '语音'}通话</span>
@@ -529,8 +580,8 @@ const WebSocketTest: React.FC = () => {
             </div>
           ) : isConnected && !inCall ? (
             <div className="flex gap-2 mb-2">
-              <Button icon={<PhoneOutlined />} onClick={() => startCall(userKey, false)}>语音</Button>
-              <Button icon={<VideoCameraOutlined />} onClick={() => startCall(userKey, true)}>视频</Button>
+              <Button icon={<PhoneOutlined />} onClick={() => startCall(userKey, false)} disabled={!authOk}>语音</Button>
+              <Button icon={<VideoCameraOutlined />} onClick={() => startCall(userKey, true)} disabled={!authOk}>视频</Button>
             </div>
           ) : isConnected && inCall ? (
             <div className="flex gap-2 mb-2 flex-wrap">
@@ -540,7 +591,6 @@ const WebSocketTest: React.FC = () => {
             </div>
           ) : null}
 
-          {/* ============ 视频画面 ============ */}
           {inCall && (
             <div className="relative bg-black rounded-lg mb-2" style={{ minHeight: 200 }}>
               {remoteVideo ? (
@@ -559,11 +609,11 @@ const WebSocketTest: React.FC = () => {
           {renderMessages(messages, userKey)}
 
           <div className="flex gap-2 mt-2">
-            <Upload showUploadList={false} beforeUpload={(file) => handleFileSelect(file, userKey)} accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.pdf,.doc,.docx" disabled={!isConnected || uploading}>
-              <Button icon={<PlusOutlined />} disabled={!isConnected || uploading} loading={uploading} title="发送文件" />
+            <Upload showUploadList={false} beforeUpload={(file) => handleFileSelect(file, userKey)} accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.pdf,.doc,.docx" disabled={!isConnected || !authOk || uploading}>
+              <Button icon={<PlusOutlined />} disabled={!isConnected || !authOk || uploading} loading={uploading} title="发送文件" />
             </Upload>
-            <Input value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} placeholder={`发给 ${targetUser.name}...`} onPressEnter={() => sendMessage(userKey)} disabled={!isConnected} className="flex-1" />
-            <Button type="primary" icon={<SendOutlined />} onClick={() => sendMessage(userKey)} disabled={!isConnected}>发送</Button>
+            <Input value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} placeholder={`发给 ${targetUser.name}...`} onPressEnter={() => sendMessage(userKey)} disabled={!isConnected || !authOk} className="flex-1" />
+            <Button type="primary" icon={<SendOutlined />} onClick={() => sendMessage(userKey)} disabled={!isConnected || !authOk}>发送</Button>
           </div>
         </div>
       </Card>
