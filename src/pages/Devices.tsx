@@ -56,7 +56,6 @@ const Devices: React.FC = () => {
     return `tcp://${tcpHost}:${tcpPort}`;
   };
 
-  // ============ 心跳 ============
   const startHeartbeat = (client: mqtt.MqttClient, deviceId: string) => {
     const wsSalt = getWSSalt();
     if (!wsSalt) return null;
@@ -70,17 +69,14 @@ const Devices: React.FC = () => {
 
   const connectMqtt = () => {
     const token = getToken();
-    const wsSalt = getWSSalt();
     if (!token) { message.error('未登录，无法连接设备'); return; }
     if (clientRef.current) clientRef.current.end();
     if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
 
     const url = getBrokerUrl();
-    // password = token:salt
-    const password = wsSalt ? `${token}:${wsSalt}` : token;
 
     const client = mqtt.connect(url, {
-      username: 'web-client', password: password,
+      username: 'web-client', password: token,
       clientId: `web_${Date.now()}`, clean: true,
       reconnectPeriod: 5000, connectTimeout: 10000,
     });
@@ -89,7 +85,6 @@ const Devices: React.FC = () => {
       setConnected(true);
       client.subscribe(`user/${USER_ID}/+/status`);
       client.subscribe(`user/${USER_ID}/+/sensor`);
-      // 启动心跳
       heartbeatTimerRef.current = startHeartbeat(client, 'web-client');
       message.success('MQTT 已连接');
     });
@@ -128,22 +123,18 @@ const Devices: React.FC = () => {
 
   const connectSimulator = () => {
     const token = getToken();
-    const wsSalt = getWSSalt();
     if (!token) return;
     if (simClientRef.current) simClientRef.current.end();
     if (simHeartbeatTimerRef.current) clearInterval(simHeartbeatTimerRef.current);
 
-    const password = wsSalt ? `${token}:${wsSalt}` : token;
-
     const client = mqtt.connect('wss://api.apiscode.org/mqtt', {
-      username: simDeviceId, password: password,
+      username: simDeviceId, password: token,
       clientId: `sim_${Date.now()}`, clean: true,
     });
 
     client.on('connect', () => {
       message.success('模拟器已连接');
       client.subscribe(`user/${USER_ID}/${simDeviceId}/command`);
-      // 启动心跳
       simHeartbeatTimerRef.current = startHeartbeat(client, simDeviceId);
     });
 
