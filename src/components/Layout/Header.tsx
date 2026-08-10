@@ -9,7 +9,8 @@ import {
   DashboardOutlined,
   AppstoreOutlined,
   MenuOutlined,
-  MessageOutlined
+  MessageOutlined,
+  ApiOutlined
 } from '@ant-design/icons';
 import { User } from '../../types';
 
@@ -143,6 +144,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, cartCount = 0, isMobile
                       <span>💬 聊天</span>
                     </button>
                     <button 
+                      onClick={() => { navigate('/devices'); setMobileMenuOpen(false); }}
+                      className="flex items-center space-x-3 w-full py-3 px-3 rounded-lg hover:bg-gray-100"
+                    >
+                      <ApiOutlined />
+                      <span>📡 设备管理</span>
+                    </button>
+                    <button 
                       onClick={() => { navigate('/orders'); setMobileMenuOpen(false); }}
                       className="flex items-center space-x-3 w-full py-3 px-3 rounded-lg hover:bg-gray-100"
                     >
@@ -235,7 +243,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, cartCount = 0, isMobile
             >
               💬 聊天
             </Button>
-            
+                        <Button 
+              type="text" 
+              icon={<ApiOutlined />}
+              onClick={() => navigate('/devices')}
+              className="text-white hover:bg-orange-600"
+            >
+              📡 设备管理
+            </Button>
             {user ? (
               <Dropdown menu={{ items: menuItems }} placement="bottomRight">
                 <Space className="cursor-pointer hover:bg-orange-600 px-3 py-1 rounded-lg transition-colors">
