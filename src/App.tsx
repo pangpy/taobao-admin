@@ -13,6 +13,7 @@ import Profile from './pages/Profile';
 import { User } from './types';
 import { initAuthSDK } from './api/sdkHelper';
 import WebSocketTest from './components/WebSocketTest';
+import Devices from './pages/Devices';
 // ✅ 新增：引入移动端样式
 import './styles/mobile.css';
 
@@ -62,6 +63,7 @@ const App: React.FC = () => {
             <Route path="orders" element={user ? <Orders /> : <Navigate to="/login" />} />
             <Route path="profile" element={user ? <Profile /> : <Navigate to="/login" />} />
             <Route path="/ws-test" element={<WebSocketTest />} />
+            <Route path="/devices" element={<Devices />} />
           </Route>
         </Routes>
       </BrowserRouter>
