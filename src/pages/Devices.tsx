@@ -82,10 +82,10 @@ const Devices: React.FC = () => {
             data: { ...prev[deviceId]?.data, ...data },
           },
         }));
-      } catch (e) {}
+      } catch (_e) {}
     });
 
-    client.on('error', (err: Error) => { setConnected(false); message.error('MQTT 连接失败'); });
+    client.on('error', () => { setConnected(false); message.error('MQTT 连接失败'); });
     client.on('close', () => setConnected(false));
     clientRef.current = client;
   };
@@ -119,7 +119,7 @@ const Devices: React.FC = () => {
           message.info(`模拟器: 开关${cmd.pin} ${cmd.value === 1 ? '开' : '关'}`);
           reportSimStatus(client);
         }
-      } catch (e) {}
+      } catch (_e) {}
     });
 
     simClientRef.current = client;
