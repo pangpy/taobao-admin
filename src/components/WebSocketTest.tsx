@@ -68,7 +68,6 @@ const getWSSalt = (): string => {
   return import.meta.env.VITE_WS_SALT || '';
 };
 
-// SHA256 工具函数
 async function sha256(message: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -82,11 +81,9 @@ const WebSocketTest: React.FC = () => {
   const [inputMessageA, setInputMessageA] = useState('');
   const wsRefA = useRef<WebSocket | null>(null);
   const [uploadingA, setUploadingA] = useState(false);
-  // 二次鉴权
   const [authOkA, setAuthOkA] = useState(false);
   const connIDRefA = useRef('');
   const sessionKeyRefA = useRef('');
-  const heartbeatTimerRefA = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [isConnectedB, setIsConnectedB] = useState(false);
   const [messagesB, setMessagesB] = useState<Message[]>([]);
@@ -96,11 +93,9 @@ const WebSocketTest: React.FC = () => {
   const [authOkB, setAuthOkB] = useState(false);
   const connIDRefB = useRef('');
   const sessionKeyRefB = useRef('');
-  const heartbeatTimerRefB = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [roomId, setRoomId] = useState('test-room-001');
 
-  // ============ WebRTC 通话状态 ============
   const [inCallA, setInCallA] = useState(false);
   const [mutedA, setMutedA] = useState(false);
   const [videoOnA, setVideoOnA] = useState(false);
@@ -132,14 +127,6 @@ const WebSocketTest: React.FC = () => {
     ],
   };
 
-  // ============ 心跳 ============
-  const startHeartbeat = (ws: WebSocket, sessionKey: string) => {
-    return setInterval(async () => {
-      // 心跳由服务端发起，客户端只响应
-      // 这里不做主动发送
-    }, 1000);
-  };
-
   useEffect(() => {
     if (localVideoRefA.current && localStreamRefA.current) localVideoRefA.current.srcObject = localStreamRefA.current;
   }, [inCallA]);
@@ -153,9 +140,6 @@ const WebSocketTest: React.FC = () => {
     if (remoteVideoRefB.current && remoteStreamRefB.current) remoteVideoRefB.current.srcObject = remoteStreamRefB.current;
   }, [remoteVideoB]);
 
-  // ============================================================
-  // 通用连接
-  // ============================================================
   const connectUser = (userKey: UserKey) => {
     const user = USER_CONFIGS[userKey];
     const isA = userKey === 'userA';
@@ -175,7 +159,6 @@ const WebSocketTest: React.FC = () => {
       websocket.onopen = () => {
         setConnected(true);
         wsRef.current = websocket;
-        // 发送二次鉴权
         const wsSalt = getWSSalt();
         websocket.send(JSON.stringify({
           type: 'auth_init',
@@ -187,12 +170,10 @@ const WebSocketTest: React.FC = () => {
         try {
           const data = JSON.parse(event.data);
 
-          // ============ 二次鉴权响应 ============
           if (data.type === 'auth_ok') {
             connIDRef.current = data.conn_id;
             sessionKeyRef.current = data.session_key;
             setAuthOk(true);
-            console.log('[WS] 二次鉴权通过:', data.conn_id);
             return;
           }
           if (data.type === 'auth_error') {
@@ -201,7 +182,6 @@ const WebSocketTest: React.FC = () => {
             return;
           }
 
-          // ============ 心跳挑战 ============
           if (data.type === 'heartbeat_challenge') {
             const answer = await sha256(sessionKeyRef.current + data.nonce);
             websocket.send(JSON.stringify({
@@ -212,10 +192,6 @@ const WebSocketTest: React.FC = () => {
             return;
           }
 
-          // ============ 未通过二次鉴权，忽略其他消息 ============
-          if (!authOk) return;
-
-          // 文件消息
           if (data.type === 'file') {
             const msg: Message = {
               id: Date.now().toString(), type: 'file',
@@ -263,16 +239,12 @@ const WebSocketTest: React.FC = () => {
           };
           if (isA) setMessagesA(prev => [...prev, msg]);
           else setMessagesB(prev => [...prev, msg]);
-        } catch (e) {}
+        } catch (_e) {}
       };
 
       websocket.onerror = () => setConnected(false);
-      websocket.onclose = () => {
-        setConnected(false);
-        setAuthOk(false);
-        wsRef.current = null;
-      };
-    } catch (error) {}
+      websocket.onclose = () => { setConnected(false); setAuthOk(false); wsRef.current = null; };
+    } catch (_error) {}
   };
 
   const disconnectUser = (userKey: UserKey) => {
@@ -285,15 +257,10 @@ const WebSocketTest: React.FC = () => {
     setAuthOk(false);
   };
 
-  // ============================================================
-  // 信令
-  // ============================================================
   const sendSignal = (userKey: UserKey, type: string, payload: any) => {
     const wsRef = userKey === 'userA' ? wsRefA : wsRefB;
     const targetUser = userKey === 'userA' ? USER_CONFIGS.userB : USER_CONFIGS.userA;
-    wsRef.current?.send(JSON.stringify({
-      type, payload, to_user_id: targetUser.id, to_role: targetUser.role,
-    }));
+    wsRef.current?.send(JSON.stringify({ type, payload, to_user_id: targetUser.id, to_role: targetUser.role }));
   };
 
   const handleSignal = async (userKey: UserKey, data: any) => {
@@ -323,11 +290,7 @@ const WebSocketTest: React.FC = () => {
       else localStreamRefB.current = stream;
 
       const pc = new RTCPeerConnection(rtcConfig);
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) sendSignal(userKey, 'webrtc_ice', event.candidate);
-      };
-
+      pc.onicecandidate = (event) => { if (event.candidate) sendSignal(userKey, 'webrtc_ice', event.candidate); };
       pc.ontrack = (event) => {
         const remoteStream = event.streams[0];
         if (isA) remoteStreamRefA.current = remoteStream;
@@ -342,7 +305,6 @@ const WebSocketTest: React.FC = () => {
       };
 
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
       if (isA) { pcRefA.current = pc; setVideoOnA(withVideo); setInCallA(true); }
       else { pcRefB.current = pc; setVideoOnB(withVideo); setInCallB(true); }
 
@@ -385,29 +347,22 @@ const WebSocketTest: React.FC = () => {
     pcRef.current = null;
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     localStreamRef.current = null;
-    if (isA) {
-      setInCallA(false); setRemoteVideoA(false); setVideoOnA(false);
-      remoteStreamRefA.current = null;
-    } else {
-      setInCallB(false); setRemoteVideoB(false); setVideoOnB(false);
-      remoteStreamRefB.current = null;
-    }
+    if (isA) { setInCallA(false); setRemoteVideoA(false); setVideoOnA(false); remoteStreamRefA.current = null; }
+    else { setInCallB(false); setRemoteVideoB(false); setVideoOnB(false); remoteStreamRefB.current = null; }
   };
 
   const toggleMute = (userKey: UserKey) => {
     const isA = userKey === 'userA';
     const localStreamRef = isA ? localStreamRefA : localStreamRefB;
     localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !t.enabled; });
-    if (isA) setMutedA(!mutedA);
-    else setMutedB(!mutedB);
+    if (isA) setMutedA(!mutedA); else setMutedB(!mutedB);
   };
 
   const toggleVideo = (userKey: UserKey) => {
     const isA = userKey === 'userA';
     const localStreamRef = isA ? localStreamRefA : localStreamRefB;
     localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = !t.enabled; });
-    if (isA) setVideoOnA(!videoOnA);
-    else setVideoOnB(!videoOnB);
+    if (isA) setVideoOnA(!videoOnA); else setVideoOnB(!videoOnB);
   };
 
   const uploadFile = async (file: File, userKey: UserKey): Promise<{ url: string; filename: string; size: number; mime: string } | null> => {
@@ -449,7 +404,7 @@ const WebSocketTest: React.FC = () => {
         fileUrl: fileInfo.url, fileName: fileInfo.filename,
         fileSize: fileInfo.size, fileMime: fileInfo.mime,
       }]);
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const handleFileSelect = async (file: File, userKey: UserKey) => {
@@ -475,7 +430,7 @@ const WebSocketTest: React.FC = () => {
       wsRef.current.send(JSON.stringify({ content: inputMessage, to_user_id: targetUser.id, to_role: targetUser.role }));
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'sent', content: inputMessage, timestamp: new Date(), fromUserId: currentUser.id, toUserId: targetUser.id }]);
       setInputMessage('');
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const renderFileContent = (item: Message) => {
@@ -596,13 +551,9 @@ const WebSocketTest: React.FC = () => {
               {remoteVideo ? (
                 <video ref={remoteVideoRef} autoPlay playsInline className="w-full rounded-lg" style={{ maxHeight: 200 }} />
               ) : (
-                <div className="flex items-center justify-center h-48 text-white text-sm">
-                  {videoOn ? '等待对方视频...' : '语音通话中...'}
-                </div>
+                <div className="flex items-center justify-center h-48 text-white text-sm">{videoOn ? '等待对方视频...' : '语音通话中...'}</div>
               )}
-              {videoOn && (
-                <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-2 right-2 w-24 h-18 rounded border-2 border-white bg-gray-800 object-cover" />
-              )}
+              {videoOn && <video ref={localVideoRef} autoPlay playsInline muted className="absolute bottom-2 right-2 w-24 h-18 rounded border-2 border-white bg-gray-800 object-cover" />}
             </div>
           )}
 
