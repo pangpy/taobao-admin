@@ -74,7 +74,7 @@ const Devices: React.FC = () => {
       message.success('MQTT 已连接');
     });
 
-    client.on('message', (topic, payload) => {
+    client.on('message', (topic: string, payload: Buffer) => {
       try {
         const parts = topic.split('/');
         const deviceId = parts[2];
@@ -93,7 +93,7 @@ const Devices: React.FC = () => {
       } catch (e) {}
     });
 
-    client.on('error', (err) => {
+    client.on('error', (err: Error) => {
       console.error('[MQTT] 错误:', err);
       setConnected(false);
       message.error('MQTT 连接失败');
