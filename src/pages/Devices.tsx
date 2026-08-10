@@ -28,6 +28,10 @@ const getToken = () => {
   return import.meta.env.VITE_ACCESS_TOKEN || localStorage.getItem('access_token') || '';
 };
 
+const getWSSalt = () => {
+  return import.meta.env.VITE_WS_SALT || '';
+};
+
 const Devices: React.FC = () => {
   const [devices, setDevices] = useState<Record<string, Device>>({});
   const [connected, setConnected] = useState(false);
@@ -35,6 +39,7 @@ const Devices: React.FC = () => {
   const [tcpHost, setTcpHost] = useState('api.apiscode.org');
   const [tcpPort, setTcpPort] = useState('1883');
   const clientRef = useRef<mqtt.MqttClient | null>(null);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simTemp, setSimTemp] = useState(26.5);
@@ -44,20 +49,38 @@ const Devices: React.FC = () => {
   const [simRelay1, setSimRelay1] = useState(false);
   const [simRelay2, setSimRelay2] = useState(false);
   const simClientRef = useRef<mqtt.MqttClient | null>(null);
+  const simHeartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const getBrokerUrl = () => {
     if (connectType === 'ws') return 'wss://api.apiscode.org/mqtt';
     return `tcp://${tcpHost}:${tcpPort}`;
   };
 
+  // ============ 心跳 ============
+  const startHeartbeat = (client: mqtt.MqttClient, deviceId: string) => {
+    const wsSalt = getWSSalt();
+    if (!wsSalt) return null;
+    const timer = setInterval(() => {
+      if (client.connected) {
+        client.publish(`user/${USER_ID}/${deviceId}/heartbeat`, wsSalt);
+      }
+    }, 30000);
+    return timer;
+  };
+
   const connectMqtt = () => {
     const token = getToken();
+    const wsSalt = getWSSalt();
     if (!token) { message.error('未登录，无法连接设备'); return; }
     if (clientRef.current) clientRef.current.end();
+    if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
 
     const url = getBrokerUrl();
+    // password = token:salt
+    const password = wsSalt ? `${token}:${wsSalt}` : token;
+
     const client = mqtt.connect(url, {
-      username: 'web-client', password: token,
+      username: 'web-client', password: password,
       clientId: `web_${Date.now()}`, clean: true,
       reconnectPeriod: 5000, connectTimeout: 10000,
     });
@@ -66,6 +89,8 @@ const Devices: React.FC = () => {
       setConnected(true);
       client.subscribe(`user/${USER_ID}/+/status`);
       client.subscribe(`user/${USER_ID}/+/sensor`);
+      // 启动心跳
+      heartbeatTimerRef.current = startHeartbeat(client, 'web-client');
       message.success('MQTT 已连接');
     });
 
@@ -86,28 +111,40 @@ const Devices: React.FC = () => {
     });
 
     client.on('error', () => { setConnected(false); message.error('MQTT 连接失败'); });
-    client.on('close', () => setConnected(false));
+    client.on('close', () => {
+      setConnected(false);
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    });
     clientRef.current = client;
   };
 
   useEffect(() => {
     connectMqtt();
-    return () => { clientRef.current?.end(); };
+    return () => {
+      clientRef.current?.end();
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    };
   }, [connectType]);
 
   const connectSimulator = () => {
     const token = getToken();
+    const wsSalt = getWSSalt();
     if (!token) return;
     if (simClientRef.current) simClientRef.current.end();
+    if (simHeartbeatTimerRef.current) clearInterval(simHeartbeatTimerRef.current);
+
+    const password = wsSalt ? `${token}:${wsSalt}` : token;
 
     const client = mqtt.connect('wss://api.apiscode.org/mqtt', {
-      username: simDeviceId, password: token,
+      username: simDeviceId, password: password,
       clientId: `sim_${Date.now()}`, clean: true,
     });
 
     client.on('connect', () => {
       message.success('模拟器已连接');
       client.subscribe(`user/${USER_ID}/${simDeviceId}/command`);
+      // 启动心跳
+      simHeartbeatTimerRef.current = startHeartbeat(client, simDeviceId);
     });
 
     client.on('message', (_topic: string, payload: Buffer) => {
@@ -128,6 +165,10 @@ const Devices: React.FC = () => {
   const disconnectSimulator = () => {
     simClientRef.current?.end();
     simClientRef.current = null;
+    if (simHeartbeatTimerRef.current) {
+      clearInterval(simHeartbeatTimerRef.current);
+      simHeartbeatTimerRef.current = null;
+    }
   };
 
   const reportSimSensor = () => {
