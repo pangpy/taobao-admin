@@ -1,6 +1,6 @@
 // src/pages/Devices.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Switch, Button, Tag, Typography, Space, message, Radio, Input } from 'antd';
+import { Card, Switch, Button, Tag, Typography, Space, message, Input } from 'antd';
 import { ReloadOutlined, ThunderboltOutlined, BulbOutlined, WifiOutlined } from '@ant-design/icons';
 import mqtt from 'mqtt';
 
@@ -140,18 +140,22 @@ const Devices: React.FC = () => {
       {/* ========== 连接方式切换 ========== */}
       <Card size="small" className="mb-4">
         <div className="flex items-center gap-4 flex-wrap">
-          <Radio.Group
-            value={connectType}
-            onChange={(e) => setConnectType(e.target.value)}
-            optionType="button"
-          >
-            <Radio.Button value="ws">
-              <WifiOutlined /> WebSocket (wss://)
-            </Radio.Button>
-            <Radio.Button value="tcp">
-              <WifiOutlined /> TCP (tcp://)
-            </Radio.Button>
-          </Radio.Group>
+          <div className="flex gap-2">
+            <Button
+              type={connectType === 'ws' ? 'primary' : 'default'}
+              icon={<WifiOutlined />}
+              onClick={() => setConnectType('ws')}
+            >
+              WebSocket (wss://)
+            </Button>
+            <Button
+              type={connectType === 'tcp' ? 'primary' : 'default'}
+              icon={<WifiOutlined />}
+              onClick={() => setConnectType('tcp')}
+            >
+              TCP (tcp://)
+            </Button>
+          </div>
 
           {connectType === 'tcp' && (
             <Space>
