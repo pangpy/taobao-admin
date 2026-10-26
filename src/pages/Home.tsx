@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Row, Col, Spin, Carousel, Statistic, Card, Alert } from 'antd';
 import { ShoppingOutlined, DollarOutlined, TeamOutlined, RocketOutlined } from '@ant-design/icons';
 import ProductCard from '../components/Product/ProductCard';
@@ -24,11 +24,6 @@ const Home: React.FC = () => {
   const [bannerLoading, setBannerLoading] = useState(true);
   const [bannerError, setBannerError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchProducts();
-    fetchBanners();
-  }, []);
-
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -43,7 +38,7 @@ const Home: React.FC = () => {
     }
   };
 
-  const fetchBanners = async () => {
+  const fetchBanners = useCallback(async (isRetry = false) => {
     setBannerLoading(true);
     setBannerError(null);
     try {
@@ -53,6 +48,13 @@ const Home: React.FC = () => {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'SELECT' }),
       });
+
+      // 首次 401：等 token 就绪后自动重试一次（不无限重试）
+      if (res.status === 401 && !isRetry) {
+        await new Promise((r) => setTimeout(r, 500));
+        return fetchBanners(true);
+      }
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.message || `HTTP ${res.status}`);
@@ -69,7 +71,12 @@ const Home: React.FC = () => {
     } finally {
       setBannerLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchBanners();
+  }, [fetchBanners]);
 
   const stats = [
     { title: '商品总数', value: 128, icon: <ShoppingOutlined />, color: 'blue' },
@@ -93,7 +100,7 @@ const Home: React.FC = () => {
           showIcon
           message="Banner 加载失败"
           description={bannerError}
-          action={<a onClick={fetchBanners}>重试</a>}
+          action={<a onClick={() => fetchBanners()}>重试</a>}
         />
       ) : banners.length === 0 ? (
         <Alert type="warning" showIcon message="暂无 Banner 数据" />
