@@ -1,16 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Spin, Carousel, Statistic, Card } from 'antd';
+import { Row, Col, Spin, Carousel, Statistic, Card, Alert } from 'antd';
 import { ShoppingOutlined, DollarOutlined, TeamOutlined, RocketOutlined } from '@ant-design/icons';
 import ProductCard from '../components/Product/ProductCard';
 import { productAPI } from '../api/product';
 import { Product } from '../types';
+import { getDynamicHeaders } from '../api/sdkHelper';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.apiscode.org';
+
+interface Banner {
+  id: number;
+  title: string;
+  subtitle: string;
+  image: string;
+  sort_order?: number;
+  status?: string;
+}
 
 const Home: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bannerLoading, setBannerLoading] = useState(true);
+  const [bannerError, setBannerError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
+    fetchBanners();
   }, []);
 
   const fetchProducts = async () => {
@@ -27,11 +43,33 @@ const Home: React.FC = () => {
     }
   };
 
-  const banners = [
-    { id: 1, title: '618=大促', subtitle: '全场5折起', image: 'https://picsum.photos/id/20/1200/400' },
-    { id: 2, title: '新品上市', subtitle: '限时优惠', image: 'https://picsum.photos/id/21/1200/400' },
-    { id: 3, title: '爆款推荐', subtitle: '热销榜单', image: 'https://picsum.photos/id/22/1200/400' },
-  ];
+  const fetchBanners = async () => {
+    setBannerLoading(true);
+    setBannerError(null);
+    try {
+      const headers = await getDynamicHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/crud/banner_3/direct`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'SELECT' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || `HTTP ${res.status}`);
+      }
+      const rows = data?.rows || data?.result?.data || [];
+      const active = rows
+        .filter((b: Banner) => b.status !== 'off')
+        .sort((a: Banner, b: Banner) => (a.sort_order || 0) - (b.sort_order || 0));
+      setBanners(active);
+    } catch (error: any) {
+      console.error('获取 Banner 失败:', error);
+      setBanners([]);
+      setBannerError(error?.message || '获取 Banner 失败');
+    } finally {
+      setBannerLoading(false);
+    }
+  };
 
   const stats = [
     { title: '商品总数', value: 128, icon: <ShoppingOutlined />, color: 'blue' },
@@ -47,21 +85,39 @@ const Home: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Banner */}
-      <Carousel autoplay effect="fade" className="rounded-xl overflow-hidden">
-        {banners.map((banner) => (
-          <div key={banner.id}>
-            <div className="relative h-80">
-              <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <h2 className="text-4xl font-bold mb-4">{banner.title}</h2>
-                  <p className="text-xl">{banner.subtitle}</p>
+      {bannerLoading ? (
+        <div className="flex justify-center items-center h-80"><Spin size="large" /></div>
+      ) : bannerError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Banner 加载失败"
+          description={bannerError}
+          action={<a onClick={fetchBanners}>重试</a>}
+        />
+      ) : banners.length === 0 ? (
+        <Alert type="warning" showIcon message="暂无 Banner 数据" />
+      ) : (
+        <Carousel autoplay effect="fade" className="rounded-xl overflow-hidden">
+          {banners.map((banner) => (
+            <div key={banner.id}>
+              <div className="relative h-80">
+                <img
+                  src={banner.image}
+                  alt={banner.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <h2 className="text-4xl font-bold mb-4">{banner.title}</h2>
+                    <p className="text-xl">{banner.subtitle}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </Carousel>
+          ))}
+        </Carousel>
+      )}
 
       {/* 统计数据 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
