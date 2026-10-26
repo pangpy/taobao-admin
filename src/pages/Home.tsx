@@ -48,7 +48,7 @@ const Home: React.FC = () => {
     setBannerError(null);
     try {
       const headers = await getDynamicHeaders();
-      const res = await fetch(`${API_BASE_URL}/api/crud/banner_3/direct`, {
+      const res = await fetch(`${API_BASE_URL}/api/crud/banner/direct`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'SELECT' }),
